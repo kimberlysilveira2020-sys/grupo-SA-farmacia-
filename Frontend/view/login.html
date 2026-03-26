@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FarmaWeb — Acesse sua conta</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --verde-escuro: #0a4a3a;
+      --verde-medio: #176b54;
+      --verde-claro: #2aad84;
+      --verde-menta: #d4f5ec;
+      --branco: #f9fdf9;
+      --cinza-suave: #e8f0ee;
+      --cinza-texto: #3a4a47;
+      --cinza-leve: #7a9490;
+      --erro: #c0392b;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      background: var(--branco);
+    }
+
+    /* --- PAINEL ESQUERDO --- */
+    .painel-esquerdo {
+      background: linear-gradient(160deg, var(--verde-escuro) 0%, var(--verde-medio) 60%, var(--verde-claro) 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 50px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .painel-esquerdo::before {
+      content: '';
+      position: absolute;
+      top: -80px; right: -80px;
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+    }
+
+    .painel-esquerdo::after {
+      content: '';
+      position: absolute;
+      bottom: -60px; left: -60px;
+      width: 220px; height: 220px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .logo-area {
+      text-align: center;
+      margin-bottom: 50px;
+      z-index: 1;
+    }
+
+    .logo-icone {
+      font-size: 64px;
+      margin-bottom: 16px;
+      display: block;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    .logo-nome {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.8rem;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+
+    .logo-sub {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.7);
+      margin-top: 6px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .beneficios {
+      z-index: 1;
+      list-style: none;
+    }
+
+    .beneficios li {
+      color: rgba(255,255,255,0.88);
+      font-size: 0.95rem;
+      padding: 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .beneficios li:last-child { border-bottom: none; }
+
+    .beneficios li span.icon {
+      background: rgba(255,255,255,0.15);
+      border-radius: 50%;
+      width: 34px; height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    /* --- PAINEL DIREITO --- */
+    .painel-direito {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 60px 70px;
+    }
+
+    .form-container {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .form-titulo {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      color: var(--verde-escuro);
+      margin-bottom: 6px;
+    }
+
+    .form-subtitulo {
+      font-size: 0.9rem;
+      color: var(--cinza-leve);
+      margin-bottom: 40px;
+    }
+
+    .campo-grupo {
+      margin-bottom: 22px;
+    }
+
+    .campo-grupo label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--cinza-texto);
+      margin-bottom: 7px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .campo-grupo input {
+      width: 100%;
+      padding: 13px 16px;
+      border: 1.5px solid var(--cinza-suave);
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      color: var(--cinza-texto);
+      background: var(--branco);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    .campo-grupo input:focus {
+      border-color: var(--verde-claro);
+      box-shadow: 0 0 0 3px rgba(42, 173, 132, 0.15);
+    }
+
+    .campo-grupo input::placeholder { color: #b0c4be; }
+
+    .linha-opcoes {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 28px;
+    }
+
+    .lembrar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: var(--cinza-leve);
+      cursor: pointer;
+    }
+
+    .lembrar input[type="checkbox"] {
+      accent-color: var(--verde-claro);
+      width: 16px; height: 16px;
+    }
+
+    .link-esqueci {
+      font-size: 0.88rem;
+      color: var(--verde-claro);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .link-esqueci:hover { text-decoration: underline; }
+
+    .btn-entrar {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(90deg, var(--verde-medio), var(--verde-claro));
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .btn-entrar:hover { opacity: 0.92; transform: translateY(-1px); }
+    .btn-entrar:active { transform: translateY(0); }
+
+    .divisor {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 28px 0;
+      color: var(--cinza-leve);
+      font-size: 0.82rem;
+    }
+
+    .divisor::before, .divisor::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--cinza-suave);
+    }
+
+    .link-cadastro {
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--cinza-leve);
+    }
+
+    .link-cadastro a {
+      color: var(--verde-claro);
+      font-weight: 500;
+      text-decoration: none;
+    }
+
+    .link-cadastro a:hover { text-decoration: underline; }
+
+    /* Mensagem de apoio humanizada */
+    .mensagem-apoio {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--cinza-suave);
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--cinza-leve);
+    }
+
+    .mensagem-apoio span {
+      display: inline-block;
+      background: var(--verde-menta);
+      padding: 4px 12px;
+      border-radius: 30px;
+      color: var(--verde-medio);
+      font-weight: 500;
+    }
+
+    @media (max-width: 768px) {
+      body { grid-template-columns: 1fr; }
+      .painel-esquerdo { display: none; }
+      .painel-direito { padding: 40px 24px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAINEL ESQUERDO -->
+  <div class="painel-esquerdo">
+    <div class="logo-area">
+      <span class="logo-icone">💊</span>
+      <div class="logo-nome">FarmaWeb</div>
+      <div class="logo-sub">Sistema de Gestão</div>
+    </div>
+    <ul class="beneficios">
+      <li>
+        <span class="icon">🛒</span>
+        Pedidos e vendas em tempo real
+      </li>
+      <li>
+        <span class="icon">📦</span>
+        Controle total do estoque
+      </li>
+      <li>
+        <span class="icon">👥</span>
+        Gestão de clientes e receitas
+      </li>
+      <li>
+        <span class="icon">📊</span>
+        Relatórios e dashboards
+      </li>
+    </ul>
+  </div>
+
+  <!-- PAINEL DIREITO -->
+  <div class="painel-direito">
+    <div class="form-container">
+      <h1 class="form-titulo">Que bom ver você! 💚</h1>
+      <p class="form-subtitulo">Acesse sua conta e cuide da sua saúde com a gente</p>
+
+      <div class="campo-grupo">
+        <label for="email">E-mail</label>
+        <input type="email" id="email" name="email" placeholder="exemplo@email.com" autocomplete="email"/>
+      </div>
+
+      <div class="campo-grupo">
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" name="senha" placeholder="••••••••" autocomplete="current-password"/>
+      </div>
+
+      <div class="linha-opcoes">
+        <label class="lembrar">
+          <input type="checkbox" name="lembrar"/> Manter conectado
+        </label>
+        <a href="#" class="link-esqueci">Esqueci minha senha</a>
+      </div>
+
+      <button class="btn-entrar" type="button">Entrar</button>
+
+      <div class="divisor">ou</div>
+
+      <p class="link-cadastro">
+        Ainda não tem uma conta? <a href="cadastro2.html">Criar conta gratuita</a>
+      </p>
+
+      <div class="mensagem-apoio">
+        <span>✨ Precisando de ajuda? Fale com a gente no chat ✨</span>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

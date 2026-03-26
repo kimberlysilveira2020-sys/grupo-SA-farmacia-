@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FarmaWeb — Seu cantinho de cuidados</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --verde-escuro: #0a4a3a;
+      --verde-medio: #176b54;
+      --verde-claro: #2aad84;
+      --verde-menta: #d4f5ec;
+      --verde-bg: #f0faf6;
+      --branco: #ffffff;
+      --cinza-suave: #e8f0ee;
+      --cinza-texto: #3a4a47;
+      --cinza-leve: #7a9490;
+      --sidebar-w: 240px;
+      --laranja: #e07b39;
+      --azul: #3178c6;
+      --roxo: #7c5cbf;
+      --vermelho: #c0392b;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--verde-bg);
+      color: var(--cinza-texto);
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: var(--sidebar-w);
+      background: var(--verde-escuro);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 50;
+    }
+
+    .sidebar-logo {
+      padding: 28px 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-logo .icone { font-size: 28px; }
+    .sidebar-logo .nome { font-family: 'Playfair Display', serif; color: #fff; font-size: 1.3rem; }
+    .sidebar-logo .sub { font-size: 0.68rem; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1.2px; }
+
+    nav { flex: 1; padding: 20px 0; overflow-y: auto; }
+
+    .nav-grupo-titulo {
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: rgba(255,255,255,0.35);
+      padding: 16px 24px 6px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 24px;
+      color: rgba(255,255,255,0.65);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: background 0.15s, color 0.15s;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }
+    .nav-item.ativo { background: rgba(42,173,132,0.18); color: var(--verde-claro); border-left-color: var(--verde-claro); }
+    .nav-item .icone-nav { font-size: 1.1rem; }
+
+    .sidebar-user {
+      padding: 18px 24px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--verde-claro); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 0.95rem; flex-shrink: 0; }
+    .user-info { flex: 1; }
+    .user-info .user-nome { font-size: 0.88rem; color: #fff; font-weight: 500; }
+    .user-info .user-cargo { font-size: 0.72rem; color: rgba(255,255,255,0.45); }
+    .btn-sair { color: rgba(255,255,255,0.4); font-size: 1rem; text-decoration: none; padding: 4px; }
+    .btn-sair:hover { color: rgba(255,255,255,0.8); }
+
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      background: var(--branco);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--cinza-suave);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .topbar-titulo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.35rem;
+      color: var(--verde-escuro);
+    }
+
+    .topbar-acoes {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .btn-novo {
+      padding: 9px 18px;
+      background: var(--verde-claro);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+
+    .btn-novo:hover { opacity: 0.88; }
+
+    .conteudo {
+      padding: 32px;
+      flex: 1;
+    }
+
+    /* CARD DE BOAS-VINDAS SUPER HUMANIZADO */
+    .card-boas-vindas {
+      background: linear-gradient(135deg, var(--verde-escuro) 0%, var(--verde-medio) 100%);
+      border-radius: 28px;
+      padding: 32px 36px;
+      margin-bottom: 32px;
+      color: white;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-boas-vindas::after {
+      content: '💊';
+      position: absolute;
+      bottom: -30px;
+      right: -20px;
+      font-size: 150px;
+      opacity: 0.08;
+      pointer-events: none;
+    }
+
+    .mensagem-dia {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .saudacao {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .saudacao h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 600;
+    }
+
+    .emoji-aceno {
+      font-size: 2.2rem;
+      animation: aceno 2s ease-in-out infinite;
+      display: inline-block;
+      transform-origin: 70% 70%;
+    }
+
+    @keyframes aceno {
+      0%, 100% { transform: rotate(0deg); }
+      20% { transform: rotate(16deg); }
+      40% { transform: rotate(-6deg); }
+      60% { transform: rotate(12deg); }
+      80% { transform: rotate(-2deg); }
+    }
+
+    .frase-motivacional {
+      font-size: 1.05rem;
+      opacity: 0.95;
+      line-height: 1.4;
+    }
+
+    .destaque-dia {
+      background: rgba(255,255,255,0.15);
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 40px;
+      font-size: 0.8rem;
+      margin-top: 8px;
+      width: fit-content;
+    }
+
+    .destaque-dia span {
+      font-weight: 600;
+    }
+
+    /* CARDS DE MÉTRICAS */
+    .grid-metricas {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-bottom: 32px;
+    }
+
+    .card-metrica {
+      background: var(--branco);
+      border-radius: 20px;
+      padding: 22px 20px;
+      box-shadow: 0 4px 16px rgba(10,74,58,0.06);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .card-metrica:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px rgba(10,74,58,0.12);
+    }
+
+    .metrica-icone { font-size: 2rem; margin-bottom: 12px; }
+    .metrica-valor { font-family: 'Playfair Display', serif; font-size: 1.9rem; font-weight: 700; color: var(--verde-escuro); }
+    .metrica-descricao { font-size: 0.85rem; color: var(--cinza-leve); margin-top: 6px; line-height: 1.3; }
+    .metrica-nota {
+      font-size: 0.7rem;
+      margin-top: 10px;
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #e6f9f2;
+      color: var(--verde-medio);
+    }
+
+    /* GRADE INFERIOR */
+    .grade-inferior {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    .card-painel {
+      background: var(--branco);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(10,74,58,0.06);
+    }
+
+    .card-painel-titulo {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--verde-escuro);
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .card-painel-titulo a {
+      font-size: 0.8rem;
+      color: var(--verde-claro);
+      text-decoration: none;
+    }
+
+    /* Lista de pedidos */
+    .lista-pedidos {
+      list-style: none;
+    }
+
+    .item-pedido {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--cinza-suave);
+    }
+
+    .item-pedido:last-child { border-bottom: none; }
+
+    .info-pedido {
+      flex: 1;
+    }
+
+    .cliente-nome {
+      font-weight: 500;
+      color: var(--cinza-texto);
+    }
+
+    .cliente-medicamento {
+      font-size: 0.75rem;
+      color: var(--cinza-leve);
+      margin-top: 4px;
+    }
+
+    .status-pedido {
+      font-size: 0.7rem;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    .status-entregue { background: #e6f9f2; color: #176b54; }
+    .status-pendente { background: #fff4e5; color: #b85c00; }
+    .status-cancelado { background: #fdecea; color: #c0392b; }
+
+    /* Lista de estoque */
+    .lista-estoque {
+      list-style: none;
+    }
+
+    .item-estoque {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--cinza-suave);
+    }
+
+    .item-estoque:last-child { border-bottom: none; }
+
+    .estoque-icone { font-size: 1.5rem; }
+    .estoque-info { flex: 1; }
+    .estoque-nome { font-weight: 500; font-size: 0.88rem; }
+    .estoque-quantidade { font-size: 0.7rem; color: var(--cinza-leve); margin-top: 2px; }
+    .estoque-alerta { font-size: 0.7rem; font-weight: 600; color: var(--vermelho); }
+
+    /* CARD DE RECONHECIMENTO */
+    .card-reconhecimento {
+      background: linear-gradient(135deg, #fff9e8 0%, #fff5e0 100%);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      border-left: 5px solid var(--verde-claro);
+    }
+
+    .reconhecimento-icone {
+      font-size: 2.8rem;
+    }
+
+    .reconhecimento-texto {
+      flex: 1;
+    }
+
+    .reconhecimento-texto p {
+      font-size: 0.95rem;
+      color: var(--cinza-texto);
+      line-height: 1.5;
+    }
+
+    .reconhecimento-texto strong {
+      color: var(--verde-escuro);
+    }
+
+    .reconhecimento-numero {
+      text-align: center;
+      background: var(--verde-menta);
+      padding: 12px 20px;
+      border-radius: 50px;
+    }
+
+    .reconhecimento-numero .numero-grande {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--verde-escuro);
+      font-family: 'Playfair Display', serif;
+    }
+
+    .reconhecimento-numero .label {
+      font-size: 0.7rem;
+      color: var(--cinza-leve);
+    }
+
+    @media (max-width: 1100px) {
+      .grid-metricas { grid-template-columns: repeat(2, 1fr); }
+      .grade-inferior { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+      .grid-metricas { grid-template-columns: 1fr; }
+      .conteudo { padding: 20px; }
+      .card-boas-vindas { padding: 24px; }
+      .saudacao h2 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span class="icone">💊</span>
+      <div>
+        <div class="nome">FarmaWeb</div>
+        <div class="sub">Cuidado que transforma vidas</div>
+      </div>
+    </div>
+
+    <nav>
+      <div class="nav-grupo-titulo">Menu</div>
+      <a href="dashboard.html" class="nav-item ativo">
+        <span class="icone-nav">🏠</span> Início
+      </a>
+      <a href="listagem.html" class="nav-item">
+        <span class="icone-nav">💊</span> Medicamentos
+      </a>
+      <a href="#" class="nav-item">
+        <span class="icone-nav">🛒</span> Vendas
+      </a>
+      <a href="#" class="nav-item">
+        <span class="icone-nav">👥</span> Clientes
+      </a>
+      <a href="#" class="nav-item">
+        <span class="icone-nav">📦</span> Estoque
+      </a>
+      <a href="#" class="nav-item">
+        <span class="icone-nav">📋</span> Receituário
+      </a>
+      <a href="#" class="nav-item">
+        <span class="icone-nav">⚙️</span> Ajustes
+      </a>
+    </nav>
+
+    <div class="sidebar-user">
+      <div class="avatar">JS</div>
+      <div class="user-info">
+        <div class="user-nome">João Silva</div>
+        <div class="user-cargo">Farmacêutico · há 3 anos cuidando</div>
+      </div>
+      <a href="login.html" class="btn-sair" title="Sair">🚪</a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="topbar-titulo">✨ Seu dia a dia com propósito</span>
+      <div class="topbar-acoes">
+        <a href="listagem.html" class="btn-novo">+ Novo produto</a>
+      </div>
+    </header>
+
+    <div class="conteudo">
+      <!-- CARD DE BOAS-VINDAS HUMANIZADO -->
+      <div class="card-boas-vindas">
+        <div class="mensagem-dia">
+          <div class="saudacao">
+            <h2>Bom dia, João</h2>
+            <div class="emoji-aceno">👋</div>
+          </div>
+          <div class="frase-motivacional">
+            🌱 Mais um dia para fazer a diferença. Cada pessoa que passa pelo seu balcão hoje carrega uma história, uma dor ou uma esperança — e você tem o poder de cuidar.
+          </div>
+          <div class="destaque-dia">
+            💚 Hoje é <span>quarta-feira, 25 de março</span> — um ótimo dia para espalhar cuidado
+          </div>
+        </div>
+      </div>
+
+      <!-- MÉTRICAS COM SIGNIFICADO -->
+      <div class="grid-metricas">
+        <div class="card-metrica">
+          <div class="metrica-icone">💰</div>
+          <!-- <div class="metrica-valor">R$ 12.840</div> -->
+          <div class="metrica-descricao">Vendas deste mês</div>
+          <!-- <div class="metrica-nota">📈 +8,3% que mês passado</div> -->
+        </div>
+        <div class="card-metrica">
+          <div class="metrica-icone">👥</div>
+          <!-- <div class="metrica-valor">348</div> -->
+          <div class="metrica-descricao">Pessoas que passaram pelo balcão hoje</div>
+          <!-- <div class="metrica-nota">💙 cada uma com uma história</div> -->
+        </div>
+        <div class="card-metrica">
+          <div class="metrica-icone">📦</div>
+          <!-- <div class="metrica-valor">1.204</div> -->
+          <div class="metrica-descricao">Medicamentos no estoque</div>
+          <!-- <div class="metrica-nota">⚡ 4 itens precisam de atenção</div> -->
+        </div>
+        <div class="card-metrica">
+          <div class="metrica-icone">🏠</div>
+          <!-- <div class="metrica-valor">836</div> -->
+          <div class="metrica-descricao">Famílias que confiam no seu trabalho</div>
+          <!-- <div class="metrica-nota">🌻 +52 famílias esse mês</div> -->
+        </div>
+      </div>
+
+      <!-- GRADE INFERIOR -->
+      <div class="grade-inferior">
+        <!-- PEDIDOS RECENTES -->
+        <div class="card-painel">
+          <div class="card-painel-titulo">
+            📋 Quem passou por aqui hoje
+            <a href="#">ver todos →</a>
+          </div>
+          <!-- <ul class="lista-pedidos">
+            <li class="item-pedido">
+              <div class="info-pedido">
+                <div class="cliente-nome">Maria Souza</div>
+                <div class="cliente-medicamento">Dipirona 500mg — para a dor de cabeça que não passava</div>
+              </div>
+              <span class="status-pedido status-entregue">✅ entregue</span>
+            </li>
+            <li class="item-pedido">
+              <div class="info-pedido">
+                <div class="cliente-nome">Carlos Lima</div>
+                <div class="cliente-medicamento">Amoxicilina — para a infecção do pequeno Pedro</div>
+              </div>
+              <span class="status-pedido status-pendente">⏳ aguardando retirada</span>
+            </li>
+            <li class="item-pedido">
+              <div class="info-pedido">
+                <div class="cliente-nome">Seu Antônio</div>
+                <div class="cliente-medicamento">Losartana — para continuar cuidando do coração</div>
+              </div>
+              <span class="status-pedido status-entregue">✅ entregue</span>
+            </li>
+            <li class="item-pedido">
+              <div class="info-pedido">
+                <div class="cliente-nome">Dona Lúcia</div>
+                <div class="cliente-medicamento">Paracetamol — alívio para a dor nas costas</div>
+              </div>
+              <span class="status-pedido status-entregue">✅ entregue</span>
+            </li>
+            <li class="item-pedido">
+              <div class="info-pedido">
+                <div class="cliente-nome">Rafaela M.</div>
+                <div class="cliente-medicamento">Dipirona + orientações sobre uso correto</div>
+              </div>
+              <span class="status-pedido status-entregue">✅ entregue</span>
+            </li>
+          </ul> -->
+        </div>
+
+        <!-- ESTOQUE QUE PRECISA DE CARINHO -->
+        <div class="card-painel">
+          <div class="card-painel-titulo">
+            ⚠️ Atenção: estoque acabando
+            <a href="#">repor estoque →</a>
+          </div>
+          <ul class="lista-estoque">
+            <li class="item-estoque">
+              <div class="estoque-icone">💊</div>
+              <div class="estoque-info">
+                <div class="estoque-nome">Dipirona 500mg</div>
+                <div class="estoque-quantidade">só mais 12 unidades</div>
+              </div>
+              <div class="estoque-alerta">crítico</div>
+            </li>
+            <li class="item-estoque">
+              <div class="estoque-icone">💉</div>
+              <div class="estoque-info">
+                <div class="estoque-nome">Insulina NPH</div>
+                <div class="estoque-quantidade">apenas 7 unidades — pacientes dependem disso</div>
+              </div>
+              <div class="estoque-alerta">urgente!</div>
+            </li>
+            <li class="item-estoque">
+              <div class="estoque-icone">🩺</div>
+              <div class="estoque-info">
+                <div class="estoque-nome">Azitromicina 500mg</div>
+                <div class="estoque-quantidade">25 unidades — vale a pena pedir mais</div>
+              </div>
+              <div class="estoque-alerta">atenção</div>
+            </li>
+            <li class="item-estoque">
+              <div class="estoque-icone">💊</div>
+              <div class="estoque-info">
+                <div class="estoque-nome">Omeprazol 20mg</div>
+                <div class="estoque-quantidade">18 unidades restantes</div>
+              </div>
+              <div class="estoque-alerta">repor em breve</div>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- CARD DE RECONHECIMENTO E IMPACTO -->
+      <div class="card-reconhecimento">
+        <div class="reconhecimento-icone">🌟</div>
+        <div class="reconhecimento-texto">
+          <p><strong>{{ session.usuario  }}, você fez a diferença hoje.</strong> Cada orientação que você dá, cada remédio que você entrega com cuidado, cada acolhida no balcão — tudo isso vira alívio para alguém. Obrigado por ser essa referência na sua comunidade.</p>
+          <p style="font-size: 0.8rem; margin-top: 8px;">💙 A saúde é feita de pessoas cuidando de pessoas — e você é parte essencial disso.</p>
+        </div>
+        <div class="reconhecimento-numero">
+          <div class="numero-grande">
+          </div>
+          <div class="label">pessoas cuidadas<br>hoje por você</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
