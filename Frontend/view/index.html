@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FarmaWeb — Saúde com cuidado de verdade</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --verde-escuro: #0a4a3a;
+      --verde-medio: #176b54;
+      --verde-claro: #2aad84;
+      --verde-menta: #d4f5ec;
+      --verde-bg: #f0faf6;
+      --branco: #ffffff;
+      --cinza-suave: #e8f0ee;
+      --cinza-texto: #3a4a47;
+      --cinza-leve: #7a9490;
+      --laranja: #e07b39;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--branco);
+      color: var(--cinza-texto);
+    }
+
+    /* ===== NAVBAR ===== */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--cinza-suave);
+      padding: 0 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 68px;
+    }
+
+    .navbar-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .navbar-logo .icone { font-size: 26px; }
+    .navbar-logo .nome {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      color: var(--verde-escuro);
+    }
+    .navbar-logo .sub {
+      font-size: 0.62rem;
+      color: var(--cinza-leve);
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      display: block;
+      margin-top: -2px;
+    }
+
+    .navbar-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .navbar-links a {
+      text-decoration: none;
+      font-size: 0.9rem;
+      color: var(--cinza-leve);
+      transition: color 0.2s;
+    }
+
+    .navbar-links a:hover { color: var(--verde-escuro); }
+
+    .navbar-acoes {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-outline {
+      padding: 9px 20px;
+      border: 1.5px solid var(--verde-claro);
+      border-radius: 9px;
+      background: transparent;
+      color: var(--verde-claro);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .btn-outline:hover {
+      background: var(--verde-menta);
+    }
+
+    .btn-primario {
+      padding: 9px 22px;
+      background: linear-gradient(90deg, var(--verde-medio), var(--verde-claro));
+      border: none;
+      border-radius: 9px;
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+
+    .btn-primario:hover { opacity: 0.9; transform: translateY(-1px); }
+
+    /* ===== HERO ===== */
+    .hero {
+      background: linear-gradient(160deg, var(--verde-escuro) 0%, var(--verde-medio) 55%, var(--verde-claro) 100%);
+      min-height: 88vh;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      padding: 80px 48px;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -120px; right: -120px;
+      width: 500px; height: 500px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.05);
+    }
+
+    .hero::after {
+      content: '💊';
+      position: absolute;
+      bottom: -60px; right: 60px;
+      font-size: 320px;
+      opacity: 0.06;
+      pointer-events: none;
+    }
+
+    .hero-conteudo {
+      max-width: 640px;
+      z-index: 1;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.9);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 6px 16px;
+      border-radius: 30px;
+      margin-bottom: 28px;
+    }
+
+    .hero-tag::before {
+      content: '';
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--verde-menta);
+    }
+
+    .hero h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.4rem, 5vw, 3.6rem);
+      color: #fff;
+      line-height: 1.18;
+      margin-bottom: 22px;
+    }
+
+    .hero h1 em {
+      font-style: italic;
+      color: var(--verde-menta);
+    }
+
+    .hero p {
+      font-size: 1.05rem;
+      color: rgba(255,255,255,0.78);
+      line-height: 1.75;
+      margin-bottom: 40px;
+      max-width: 520px;
+    }
+
+    .hero-acoes {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .btn-hero-primario {
+      padding: 15px 32px;
+      background: #fff;
+      color: var(--verde-escuro);
+      border: none;
+      border-radius: 11px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.15s, box-shadow 0.2s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    .btn-hero-primario:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.18); }
+
+    .btn-hero-secundario {
+      padding: 15px 32px;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      border: 1.5px solid rgba(255,255,255,0.35);
+      border-radius: 11px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 400;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.2s;
+    }
+
+    .btn-hero-secundario:hover { background: rgba(255,255,255,0.2); }
+
+    .hero-numeros {
+      display: flex;
+      gap: 40px;
+      margin-top: 56px;
+      flex-wrap: wrap;
+    }
+
+    .numero-item {
+      color: rgba(255,255,255,0.9);
+    }
+
+    .numero-item .valor {
+      font-family: 'Playfair Display', serif;
+      font-size: 2rem;
+      font-weight: 700;
+      display: block;
+      color: #fff;
+    }
+
+    .numero-item .rotulo {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.55);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ===== SEÇÃO: COMO FUNCIONA ===== */
+    .secao {
+      padding: 96px 48px;
+    }
+
+    .secao-verde {
+      background: var(--verde-bg);
+    }
+
+    .secao-header {
+      text-align: center;
+      max-width: 560px;
+      margin: 0 auto 60px;
+    }
+
+    .secao-etiqueta {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--verde-claro);
+      background: var(--verde-menta);
+      padding: 5px 14px;
+      border-radius: 30px;
+      margin-bottom: 14px;
+    }
+
+    .secao-header h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.2rem;
+      color: var(--verde-escuro);
+      margin-bottom: 14px;
+      line-height: 1.25;
+    }
+
+    .secao-header p {
+      font-size: 0.97rem;
+      color: var(--cinza-leve);
+      line-height: 1.7;
+    }
+
+    /* Passos */
+    .passos {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 28px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .passo-card {
+      background: var(--branco);
+      border-radius: 18px;
+      padding: 32px 28px;
+      border: 1px solid var(--cinza-suave);
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .passo-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 36px rgba(10,74,58,0.09);
+    }
+
+    .passo-numero {
+      font-family: 'Playfair Display', serif;
+      font-size: 3rem;
+      font-weight: 700;
+      color: var(--verde-menta);
+      line-height: 1;
+      margin-bottom: 16px;
+    }
+
+    .passo-icone {
+      font-size: 2rem;
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .passo-card h3 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.15rem;
+      color: var(--verde-escuro);
+      margin-bottom: 10px;
+    }
+
+    .passo-card p {
+      font-size: 0.88rem;
+      color: var(--cinza-leve);
+      line-height: 1.65;
+    }
+
+    /* ===== CATEGORIAS ===== */
+    .categorias-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .categoria-card {
+      background: var(--branco);
+      border: 1px solid var(--cinza-suave);
+      border-radius: 16px;
+      padding: 28px 20px;
+      text-align: center;
+      text-decoration: none;
+      color: var(--cinza-texto);
+      transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+
+    .categoria-card:hover {
+      border-color: var(--verde-claro);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(42,173,132,0.12);
+    }
+
+    .categoria-card .emoji {
+      font-size: 2.2rem;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .categoria-card .nome {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--verde-escuro);
+    }
+
+    .categoria-card .qtd {
+      font-size: 0.75rem;
+      color: var(--cinza-leve);
+      margin-top: 4px;
+    }
+
+    /* ===== PRODUTOS EM DESTAQUE ===== */
+    .produtos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 22px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .produto-card {
+      background: var(--branco);
+      border: 1px solid var(--cinza-suave);
+      border-radius: 18px;
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .produto-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 32px rgba(10,74,58,0.1);
+    }
+
+    .produto-img {
+      background: var(--verde-bg);
+      height: 160px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 4rem;
+      position: relative;
+    }
+
+    .produto-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: var(--laranja);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+
+    .produto-badge.receita {
+      background: var(--verde-escuro);
+    }
+
+    .produto-info {
+      padding: 18px 20px 20px;
+    }
+
+    .produto-categoria {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--verde-claro);
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .produto-nome {
+      font-family: 'Playfair Display', serif;
+      font-size: 1rem;
+      color: var(--verde-escuro);
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+
+    .produto-desc {
+      font-size: 0.8rem;
+      color: var(--cinza-leve);
+      margin-bottom: 14px;
+      line-height: 1.55;
+    }
+
+    .produto-rodape {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .produto-preco {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.25rem;
+      color: var(--verde-escuro);
+      font-weight: 700;
+    }
+
+    .produto-preco small {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.75rem;
+      color: var(--cinza-leve);
+      font-weight: 400;
+    }
+
+    .btn-carrinho {
+      padding: 8px 16px;
+      background: var(--verde-claro);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+
+    .btn-carrinho:hover { opacity: 0.88; }
+
+    /* ===== BANNER URGÊNCIA ===== */
+    .banner-urgencia {
+      background: linear-gradient(90deg, var(--verde-escuro), var(--verde-medio));
+      padding: 48px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .banner-urgencia::before {
+      content: '🕐';
+      position: absolute;
+      left: 40px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 80px;
+      opacity: 0.1;
+    }
+
+    .banner-urgencia::after {
+      content: '🚚';
+      position: absolute;
+      right: 40px; top: 50%;
+      transform: translateY(-50%);
+      font-size: 80px;
+      opacity: 0.1;
+    }
+
+    .banner-urgencia h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.9rem;
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    .banner-urgencia p {
+      color: rgba(255,255,255,0.75);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    /* ===== DEPOIMENTOS ===== */
+    .depoimentos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 22px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .depoimento-card {
+      background: var(--branco);
+      border: 1px solid var(--cinza-suave);
+      border-radius: 16px;
+      padding: 28px 26px;
+      transition: box-shadow 0.2s;
+    }
+
+    .depoimento-card:hover {
+      box-shadow: 0 8px 24px rgba(10,74,58,0.08);
+    }
+
+    .estrelas {
+      color: #f5b942;
+      font-size: 0.9rem;
+      margin-bottom: 14px;
+      letter-spacing: 2px;
+    }
+
+    .depoimento-texto {
+      font-size: 0.9rem;
+      color: var(--cinza-texto);
+      line-height: 1.7;
+      margin-bottom: 20px;
+      font-style: italic;
+    }
+
+    .depoimento-autor {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .autor-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--verde-claro);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .autor-nome {
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--verde-escuro);
+    }
+
+    .autor-detalhe {
+      font-size: 0.76rem;
+      color: var(--cinza-leve);
+      margin-top: 2px;
+    }
+
+    /* ===== FOOTER ===== */
+    footer {
+      background: var(--verde-escuro);
+      color: rgba(255,255,255,0.65);
+      padding: 60px 48px 36px;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 40px;
+      margin-bottom: 48px;
+    }
+
+    .footer-marca .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      color: #fff;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .footer-marca p {
+      font-size: 0.88rem;
+      line-height: 1.7;
+      max-width: 280px;
+    }
+
+    .footer-col h4 {
+      color: rgba(255,255,255,0.9);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+
+    .footer-col ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .footer-col ul a {
+      color: rgba(255,255,255,0.55);
+      text-decoration: none;
+      font-size: 0.88rem;
+      transition: color 0.2s;
+    }
+
+    .footer-col ul a:hover { color: rgba(255,255,255,0.9); }
+
+    .footer-rodape {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: gap;
+      gap: 16px;
+    }
+
+    .footer-rodape p {
+      font-size: 0.82rem;
+    }
+
+    .footer-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.07);
+      padding: 6px 16px;
+      border-radius: 30px;
+      font-size: 0.8rem;
+    }
+
+    /* ===== RESPONSIVO ===== */
+    @media (max-width: 768px) {
+      .navbar { padding: 0 20px; }
+      .navbar-links { display: none; }
+      .hero { padding: 60px 24px; min-height: auto; }
+      .secao { padding: 60px 24px; }
+      .footer-grid { grid-template-columns: 1fr 1fr; }
+      .banner-urgencia { padding: 36px 24px; }
+      footer { padding: 48px 24px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <a href="#" class="navbar-logo">
+      <span class="icone">💊</span>
+      <div>
+        <span class="nome">FarmaWeb</span>
+        <span class="sub">Sistema de Gestão</span>
+      </div>
+    </a>
+
+    <ul class="navbar-links">
+      <li><a href="#como-funciona">Como funciona</a></li>
+      <li><a href="#categorias">Categorias</a></li>
+      <li><a href="#produtos">Produtos</a></li>
+      <li><a href="#depoimentos">Avaliações</a></li>
+    </ul>
+
+    <div class="navbar-acoes">
+      <a href="../view/login.html" class="btn-outline">Entrar</a>
+      <a href="../view/cadastro.html" class="btn-primario">Criar conta</a>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-conteudo">
+      <div class="hero-tag">Farmácia online • Entrega rápida</div>
+
+      <h1>Sua saúde merece<br/><em>cuidado de verdade</em></h1>
+
+      <p>Medicamentos, vitaminas, dermocosméticos e muito mais — tudo entregue na sua porta com segurança, praticidade e o carinho que você merece.</p>
+
+      <div class="hero-acoes">
+        <a href="../view/cadastro.html" class="btn-hero-primario">Começar agora 💚</a>
+        <a href="../view/listagem.html" class="btn-hero-secundario">Ver produtos</a>
+      </div>
+
+      <div class="hero-numeros">
+        <div class="numero-item">
+          <span class="valor">+12 mil</span>
+          <span class="rotulo">Clientes ativos</span>
+        </div>
+        <div class="numero-item">
+          <span class="valor">+3 mil</span>
+          <span class="rotulo">Produtos disponíveis</span>
+        </div>
+        <div class="numero-item">
+          <span class="valor">4.9 ★</span>
+          <span class="rotulo">Avaliação média</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMO FUNCIONA -->
+  <section class="secao" id="como-funciona">
+    <div class="secao-header">
+      <span class="secao-etiqueta">Como funciona</span>
+      <h2>Simples, rápido e seguro</h2>
+      <p>Do cadastro até a entrega em casa, tudo pensado para a sua comodidade.</p>
+    </div>
+
+    <div class="passos">
+      <div class="passo-card">
+        <div class="passo-numero">01</div>
+        <span class="passo-icone">📝</span>
+        <h3>Crie sua conta</h3>
+        <p>Cadastro rápido em menos de 2 minutos. Seus dados ficam seguros e protegidos conosco.</p>
+      </div>
+      <div class="passo-card">
+        <div class="passo-numero">02</div>
+        <span class="passo-icone">🔍</span>
+        <h3>Encontre o que precisa</h3>
+        <p>Busque por nome, categoria ou princípio ativo. Mais de 3.000 produtos à sua disposição.</p>
+      </div>
+      <div class="passo-card">
+        <div class="passo-numero">03</div>
+        <span class="passo-icone">🛒</span>
+        <h3>Adicione ao carrinho</h3>
+        <p>Monte seu pedido com calma. Para medicamentos com receita, basta enviá-la pelo app.</p>
+      </div>
+      <div class="passo-card">
+        <div class="passo-numero">04</div>
+        <span class="passo-icone">🚚</span>
+        <h3>Receba em casa</h3>
+        <p>Entrega rápida e rastreável. Você acompanha tudo pelo painel em tempo real.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORIAS -->
+  <section class="secao secao-verde" id="categorias">
+    <div class="secao-header">
+      <span class="secao-etiqueta">Categorias</span>
+      <h2>O que você está procurando?</h2>
+      <p>Navegue pelas principais categorias da nossa farmácia completa.</p>
+    </div>
+
+    <div class="categorias-grid">
+      <a href="../view/listagem.html" class="categoria-card">
+        <span class="emoji">💊</span>
+        <div class="nome">Medicamentos</div>
+        <div class="qtd">1.240 itens</div>
+      </a>
+      <a href="../view/listagem.html" class="categoria-card">
+        <span class="emoji">🌿</span>
+        <div class="nome">Vitaminas</div>
+        <div class="qtd">380 itens</div>
+      </a>
+      <a href="../view/listagem.html" class="categoria-card">
+        <span class="emoji">🧴</span>
+        <div class="nome">Dermocosméticos</div>
+        <div class="qtd">520 itens</div>
+      </a>
+      <a href="../view/listagem.html" class="categoria-card">
+        <span class="emoji">👶</span>
+        <div class="nome">Bebê & Mamãe</div>
+        <div class="qtd">290 itens</div>
+      </a>
+      <a href="../view/listagem.html" class="categoria-card">
+        <span class="emoji">🩺</span>
+        <div class="nome">Equipamentos</div>
+        <div class="qtd">140 itens</div>
+      </a>
+      <a href="../view/listagem.html" class="categoria-card">
+        <span class="emoji">🦷</span>
+        <div class="nome">Higiene Bucal</div>
+        <div class="qtd">210 itens</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- PRODUTOS EM DESTAQUE -->
+  <section class="secao" id="produtos">
+    <div class="secao-header">
+      <span class="secao-etiqueta">Destaques</span>
+      <h2>Mais buscados hoje</h2>
+      <p>Produtos que nossos clientes mais amam e recomendam.</p>
+    </div>
+
+    <div class="produtos-grid">
+      <div class="produto-card">
+        <div class="produto-img">
+          💊
+          <span class="produto-badge">Oferta</span>
+        </div>
+        <div class="produto-info">
+          <div class="produto-categoria">Analgésico</div>
+          <div class="produto-nome">Dipirona Monoidratada 500mg</div>
+          <div class="produto-desc">Alívio rápido de dores e febre. Caixa com 20 comprimidos.</div>
+          <div class="produto-rodape">
+            <div class="produto-preco">R$ 8,90 <small>/cx</small></div>
+            <button class="btn-carrinho">+ Carrinho</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produto-card">
+        <div class="produto-img">
+          🌿
+        </div>
+        <div class="produto-info">
+          <div class="produto-categoria">Vitamina</div>
+          <div class="produto-nome">Vitamina C 1000mg Efervescente</div>
+          <div class="produto-desc">Imunidade reforçada com sabor laranja. Tubo com 10 comprimidos.</div>
+          <div class="produto-rodape">
+            <div class="produto-preco">R$ 24,50 <small>/tb</small></div>
+            <button class="btn-carrinho">+ Carrinho</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produto-card">
+        <div class="produto-img">
+          🧴
+          <span class="produto-badge">Mais vendido</span>
+        </div>
+        <div class="produto-info">
+          <div class="produto-categoria">Dermocosmético</div>
+          <div class="produto-nome">Protetor Solar FPS 60 Oil Free</div>
+          <div class="produto-desc">Textura leve para pele oleosa. Proteção UVA/UVB. 60ml.</div>
+          <div class="produto-rodape">
+            <div class="produto-preco">R$ 49,90 <small>/un</small></div>
+            <button class="btn-carrinho">+ Carrinho</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="produto-card">
+        <div class="produto-img">
+          💉
+          <span class="produto-badge receita">Com receita</span>
+        </div>
+        <div class="produto-info">
+          <div class="produto-categoria">Antibiótico</div>
+          <div class="produto-nome">Amoxicilina 500mg</div>
+          <div class="produto-desc">Antibiótico de amplo espectro. Caixa com 21 cápsulas. Requer receita.</div>
+          <div class="produto-rodape">
+            <div class="produto-preco">R$ 31,70 <small>/cx</small></div>
+            <button class="btn-carrinho">+ Carrinho</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BANNER -->
+  <section class="banner-urgencia">
+    <h2>Entrega expressa em até 2h 🚚</h2>
+    <p>Para a região central, fazemos entrega expressa no mesmo dia. Pedidos até 18h.</p>
+    <a href="../view/cadastro.html" class="btn-hero-primario" style="display: inline-block;">Fazer meu primeiro pedido</a>
+  </section>
+
+  <!-- DEPOIMENTOS -->
+  <section class="secao secao-verde" id="depoimentos">
+    <div class="secao-header">
+      <span class="secao-etiqueta">Avaliações</span>
+      <h2>O que nossos clientes dizem</h2>
+      <p>Mais de 12 mil clientes satisfeitos. Veja o que eles falam sobre a gente.</p>
+    </div>
+
+    <div class="depoimentos-grid">
+      <div class="depoimento-card">
+        <div class="estrelas">★★★★★</div>
+        <p class="depoimento-texto">"Incrível! Pedi às 9h e chegou antes do almoço. Embalagem cuidadosa e o preço foi ótimo. Não compro mais em farmácia física."</p>
+        <div class="depoimento-autor">
+          <div class="autor-avatar">MR</div>
+          <div>
+            <div class="autor-nome">Maria Rodrigues</div>
+            <div class="autor-detalhe">Cliente desde 2023 · São Paulo</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="depoimento-card">
+        <div class="estrelas">★★★★★</div>
+        <p class="depoimento-texto">"Precisei de um antibiótico com urgência. Enviei a receita pelo site e em 20 minutos já estava aprovado. Salvou meu dia!"</p>
+        <div class="depoimento-autor">
+          <div class="autor-avatar" style="background: var(--verde-medio);">CF</div>
+          <div>
+            <div class="autor-nome">Carlos Ferreira</div>
+            <div class="autor-detalhe">Cliente desde 2024 · Campinas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="depoimento-card">
+        <div class="estrelas">★★★★★</div>
+        <p class="depoimento-texto">"O atendimento é humanizado de verdade. Tive uma dúvida sobre interação medicamentosa e me responderam rapidíssimo. Recomendo muito!"</p>
+        <div class="depoimento-autor">
+          <div class="autor-avatar" style="background: var(--verde-escuro);">AL</div>
+          <div>
+            <div class="autor-nome">Ana Lima</div>
+            <div class="autor-detalhe">Cliente desde 2022 · Santos</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-grid">
+      <div class="footer-marca">
+        <div class="logo">💊 FarmaWeb</div>
+        <p>Cuidando da saúde da sua família com carinho, segurança e tecnologia. Farmácia online autorizada pela ANVISA.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Produtos</h4>
+        <ul>
+          <li><a href="../view/listagem.html">Medicamentos</a></li>
+          <li><a href="../view/listagem.html">Vitaminas</a></li>
+          <li><a href="../view/listagem.html">Dermocosméticos</a></li>
+          <li><a href="../view/listagem.html">Bebê & Mamãe</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Empresa</h4>
+        <ul>
+          <li><a href="#">Sobre nós</a></li>
+          <li><a href="#">Blog de saúde</a></li>
+          <li><a href="#">Trabalhe conosco</a></li>
+          <li><a href="#">Imprensa</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Suporte</h4>
+        <ul>
+          <li><a href="#">Central de ajuda</a></li>
+          <li><a href="#">Como enviar receita</a></li>
+          <li><a href="#">Rastrear pedido</a></li>
+          <li><a href="#">Fale conosco</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-rodape">
+      <p>© 2025 FarmaWeb. Todos os direitos reservados.</p>
+      <div class="footer-badge">
+        💚 Autorizada pela ANVISA · CRF/SP 00000
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

@@ -16,6 +16,7 @@
       --cinza-texto: #3a4a47;
       --cinza-leve: #7a9490;
       --erro: #c0392b;
+      --erro-bg: #fff0f0;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -91,10 +92,7 @@
       text-transform: uppercase;
     }
 
-    .beneficios {
-      z-index: 1;
-      list-style: none;
-    }
+    .beneficios { z-index: 1; list-style: none; }
 
     .beneficios li {
       color: rgba(255,255,255,0.88);
@@ -144,9 +142,21 @@
       margin-bottom: 40px;
     }
 
-    .campo-grupo {
-      margin-bottom: 22px;
+    /* Alerta de erro */
+    .alerta-erro {
+      background: var(--erro-bg);
+      border: 1.5px solid var(--erro);
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 24px;
+      font-size: 0.88rem;
+      color: var(--erro);
+      display: none;
     }
+
+    .alerta-erro.visivel { display: block; }
+
+    .campo-grupo { margin-bottom: 22px; }
 
     .campo-grupo label {
       display: block;
@@ -174,6 +184,11 @@
     .campo-grupo input:focus {
       border-color: var(--verde-claro);
       box-shadow: 0 0 0 3px rgba(42, 173, 132, 0.15);
+    }
+
+    .campo-grupo input.invalido {
+      border-color: var(--erro);
+      box-shadow: 0 0 0 3px rgba(192,57,43,0.10);
     }
 
     .campo-grupo input::placeholder { color: #b0c4be; }
@@ -225,6 +240,7 @@
 
     .btn-entrar:hover { opacity: 0.92; transform: translateY(-1px); }
     .btn-entrar:active { transform: translateY(0); }
+    .btn-entrar:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
     .divisor {
       display: flex;
@@ -256,7 +272,6 @@
 
     .link-cadastro a:hover { text-decoration: underline; }
 
-    /* Mensagem de apoio humanizada */
     .mensagem-apoio {
       margin-top: 28px;
       padding-top: 20px;
@@ -292,22 +307,10 @@
       <div class="logo-sub">Sistema de Gestão</div>
     </div>
     <ul class="beneficios">
-      <li>
-        <span class="icon">🛒</span>
-        Pedidos e vendas em tempo real
-      </li>
-      <li>
-        <span class="icon">📦</span>
-        Controle total do estoque
-      </li>
-      <li>
-        <span class="icon">👥</span>
-        Gestão de clientes e receitas
-      </li>
-      <li>
-        <span class="icon">📊</span>
-        Relatórios e dashboards
-      </li>
+      <li><span class="icon">🛒</span> Pedidos e vendas em tempo real</li>
+      <li><span class="icon">📦</span> Controle total do estoque</li>
+      <li><span class="icon">👥</span> Gestão de clientes e receitas</li>
+      <li><span class="icon">📊</span> Relatórios e dashboards</li>
     </ul>
   </div>
 
@@ -317,29 +320,37 @@
       <h1 class="form-titulo">Que bom ver você! 💚</h1>
       <p class="form-subtitulo">Acesse sua conta e cuide da sua saúde com a gente</p>
 
-      <div class="campo-grupo">
-        <label for="email">E-mail</label>
-        <input type="email" id="email" name="email" placeholder="exemplo@email.com" autocomplete="email"/>
-      </div>
+      <div class="alerta-erro" id="alerta-erro"></div>
 
-      <div class="campo-grupo">
-        <label for="senha">Senha</label>
-        <input type="password" id="senha" name="senha" placeholder="••••••••" autocomplete="current-password"/>
-      </div>
+      <form action="login.php" method="POST" id="form-login">
 
-      <div class="linha-opcoes">
-        <label class="lembrar">
-          <input type="checkbox" name="lembrar"/> Manter conectado
-        </label>
-        <a href="#" class="link-esqueci">Esqueci minha senha</a>
-      </div>
+        <div class="campo-grupo">
+          <label for="email">E-mail</label>
+          <input type="email" id="email" name="email"
+                 placeholder="exemplo@email.com" autocomplete="email" required/>
+        </div>
 
-      <button class="btn-entrar" type="button">Entrar</button>
+        <div class="campo-grupo">
+          <label for="senha">Senha</label>
+          <input type="password" id="senha" name="senha"
+                 placeholder="••••••••" autocomplete="current-password" required/>
+        </div>
+
+        <div class="linha-opcoes">
+          <label class="lembrar">
+            <input type="checkbox" name="lembrar"/> Manter conectado
+          </label>
+          <a href="#" class="link-esqueci">Esqueci minha senha</a>
+        </div>
+
+        <button class="btn-entrar" type="submit" id="btn-entrar">Entrar</button>
+
+      </form>
 
       <div class="divisor">ou</div>
 
       <p class="link-cadastro">
-        Ainda não tem uma conta? <a href="cadastro2.html">Criar conta gratuita</a>
+        Ainda não tem uma conta? <a href="cadastro.html">Criar conta gratuita</a>
       </p>
 
       <div class="mensagem-apoio">
@@ -347,6 +358,44 @@
       </div>
     </div>
   </div>
+
+  <script>
+    document.getElementById('form-login').addEventListener('submit', function (e) {
+      const email  = document.getElementById('email');
+      const senha  = document.getElementById('senha');
+      const alerta = document.getElementById('alerta-erro');
+      const btn    = document.getElementById('btn-entrar');
+
+      // Limpa erros anteriores
+      email.classList.remove('invalido');
+      senha.classList.remove('invalido');
+      alerta.classList.remove('visivel');
+
+      let erro = '';
+
+      if (!email.value.trim()) {
+        email.classList.add('invalido');
+        erro = 'Informe seu e-mail para continuar.';
+      } else if (!email.value.includes('@')) {
+        email.classList.add('invalido');
+        erro = 'Digite um e-mail válido.';
+      } else if (!senha.value) {
+        senha.classList.add('invalido');
+        erro = 'Informe sua senha para continuar.';
+      }
+
+      if (erro) {
+        e.preventDefault();
+        alerta.textContent = '⚠️ ' + erro;
+        alerta.classList.add('visivel');
+        return;
+      }
+
+      // Feedback visual enquanto envia
+      btn.disabled = true;
+      btn.textContent = 'Entrando...';
+    });
+  </script>
 
 </body>
 </html>
