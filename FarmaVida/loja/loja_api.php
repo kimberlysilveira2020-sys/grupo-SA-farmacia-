@@ -18,6 +18,62 @@ function salvarImagemLoja(string $campo, string $pasta): ?string {
     return $nome;
 }
 
+// ── Gerador de Payload PIX (padrão EMV / Banco Central do Brasil) ──────────
+function gerarPayloadPix(string $chave, string $nome, string $cidade, float $valor, string $txid = ''): string {
+    // Limpa e padroniza
+    $nome   = mb_strtoupper(substr(preg_replace('/[^A-Za-z0-9 ]/', '', $nome), 0, 25));
+    $cidade = mb_strtoupper(substr(preg_replace('/[^A-Za-z0-9 ]/', '', $cidade), 0, 15));
+    $txid   = preg_replace('/[^A-Za-z0-9]/', '', $txid ?: 'FARMAVIDA'.time());
+    $txid   = substr($txid, 0, 25);
+
+    $valorStr = number_format($valor, 2, '.', '');
+
+    // Merchant Account Information (ID 26)
+    $gui     = tlv('00', 'br.gov.bcb.pix');
+    $chaveTV = tlv('01', $chave);
+    $mai     = tlv('26', $gui . $chaveTV);
+
+    // Additional Data Field (ID 62) — txid
+    $txidTV = tlv('05', $txid);
+    $adf    = tlv('62', $txidTV);
+
+    // Monta payload sem CRC
+    $payload =
+        tlv('00', '01')             . // Payload Format Indicator
+        tlv('01', '12')             . // Point of Initiation Method (12 = dinâmico, 11 = estático)
+        $mai                        . // Merchant Account Information
+        tlv('52', '0000')           . // Merchant Category Code
+        tlv('53', '986')            . // Transaction Currency (BRL)
+        tlv('54', $valorStr)        . // Transaction Amount
+        tlv('58', 'BR')             . // Country Code
+        tlv('59', $nome)            . // Merchant Name
+        tlv('60', $cidade)          . // Merchant City
+        $adf                        . // Additional Data Field
+        '6304';                       // CRC placeholder
+
+    // CRC16-CCITT
+    $crc = crc16($payload);
+    return $payload . strtoupper(str_pad(dechex($crc), 4, '0', STR_PAD_LEFT));
+}
+
+function tlv(string $id, string $value): string {
+    return $id . str_pad(strlen($value), 2, '0', STR_PAD_LEFT) . $value;
+}
+
+function crc16(string $str): int {
+    $crc = 0xFFFF;
+    for ($i = 0; $i < strlen($str); $i++) {
+        $crc ^= ord($str[$i]) << 8;
+        for ($j = 0; $j < 8; $j++) {
+            if ($crc & 0x8000) { $crc = ($crc << 1) ^ 0x1021; }
+            else                { $crc <<= 1; }
+            $crc &= 0xFFFF;
+        }
+    }
+    return $crc;
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 try {
     switch ($endpoint) {
 
@@ -99,7 +155,6 @@ try {
 
             $whereSQL = 'WHERE '.implode(' AND ',$where);
 
-            // Total para paginação
             $stmtCount = $pdo->prepare("
                 SELECT COUNT(*) FROM produtos p
                 LEFT JOIN (SELECT produto_id, SUM(qtd_atual) AS total FROM lotes WHERE qtd_atual>0 GROUP BY produto_id) est ON est.produto_id=p.id
@@ -123,7 +178,6 @@ try {
             $stmtP->execute($params);
             $produtos = $stmtP->fetchAll();
 
-            // Aplica desconto para lotes vencendo
             foreach ($produtos as &$p) {
                 $p['desconto']      = 0;
                 $p['preco_original']= null;
@@ -136,6 +190,25 @@ try {
             }
 
             jsonResp(['success'=>true,'produtos'=>$produtos,'total'=>$total,'paginas'=>ceil($total/$porPagina)]);
+            break;
+
+        // ── CATEGORIAS ─────────────────────────────────────────────
+        case 'categorias':
+            try {
+                $cats = $pdo->query("
+                    SELECT nome, icone FROM categorias WHERE ativo=1 ORDER BY ordem ASC, nome ASC
+                ")->fetchAll();
+                jsonResp(['success'=>true,'categorias'=>$cats]);
+            } catch (\Exception $e) {
+                jsonResp(['success'=>true,'categorias'=>[
+                    ['nome'=>'Comum',          'icone'=>'bi-capsule'],
+                    ['nome'=>'Genérico',       'icone'=>'bi-capsule-pill'],
+                    ['nome'=>'Vitaminas',      'icone'=>'bi-heart'],
+                    ['nome'=>'Dermocosméticos','icone'=>'bi-stars'],
+                    ['nome'=>'Higiene',        'icone'=>'bi-droplet'],
+                    ['nome'=>'Beleza',         'icone'=>'bi-flower1'],
+                ]]);
+            }
             break;
 
         // ── BANNERS ─────────────────────────────────────────────────
@@ -154,7 +227,80 @@ try {
             jsonResp(['success'=>true,'banners'=>$banners]);
             break;
 
-        // ── FINALIZAR PEDIDO ────────────────────────────────────────
+        // ── GERAR PIX ───────────────────────────────────────────────
+        // Cria o pedido em status "aguardando_pix" e retorna o payload + txid
+        case 'gerar_pix':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Faça login para finalizar.'],401);
+
+            $itens = json_decode($_POST['itens'] ?? '[]', true);
+            if (empty($itens)) jsonResp(['success'=>false,'message'=>'Carrinho vazio.']);
+
+            // Garante colunas extras na tabela pedidos (migração automática)
+            try {
+                $cols = $pdo->query("SHOW COLUMNS FROM pedidos LIKE 'pix_txid'")->fetchAll();
+                if (empty($cols)) {
+                    $pdo->exec("ALTER TABLE pedidos
+                        ADD COLUMN `forma_pagamento` VARCHAR(20) NOT NULL DEFAULT 'pix' AFTER `status`,
+                        ADD COLUMN `pix_txid`        VARCHAR(50) NULL AFTER `forma_pagamento`,
+                        ADD COLUMN `pix_pago`        TINYINT(1)  NOT NULL DEFAULT 0 AFTER `pix_txid`
+                    ");
+                }
+            } catch (\Exception $e) { /* Colunas já existem */ }
+
+            $pdo->beginTransaction();
+            $total = 0;
+            foreach ($itens as $i) { $total += $i['quantidade'] * $i['preco']; }
+
+            // Gera txid único
+            $txid = 'FV' . strtoupper(substr(uniqid(), -10)) . rand(10,99);
+
+            $s = $pdo->prepare("INSERT INTO pedidos (cliente_id,total,status,forma_pagamento,pix_txid,pix_pago) VALUES (?,?,'pendente','pix',?,0)");
+            $s->execute([clienteId(), $total, $txid]);
+            $pedidoId = $pdo->lastInsertId();
+
+            $si = $pdo->prepare("INSERT INTO pedido_itens (pedido_id,produto_id,quantidade,preco) VALUES (?,?,?,?)");
+            foreach ($itens as $i) {
+                $si->execute([$pedidoId, $i['produto_id'], $i['quantidade'], $i['preco']]);
+            }
+            $pdo->commit();
+
+            // Gera o payload EMV do PIX
+            $payload = gerarPayloadPix(
+                Config::PIX_CHAVE,
+                Config::PIX_NOME,
+                Config::PIX_CIDADE,
+                (float)$total,
+                $txid
+            );
+
+            jsonResp([
+                'success'    => true,
+                'pedido_id'  => $pedidoId,
+                'txid'       => $txid,
+                'total'      => $total,
+                'payload'    => $payload,   // Copia e Cola
+                'pix_chave'  => Config::PIX_CHAVE,
+                'pix_nome'   => Config::PIX_NOME,
+            ]);
+            break;
+
+        // ── CANCELAR PIX (pedido não pago — remove do banco) ────────
+        case 'cancelar_pix':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Não autenticado.'],401);
+            $pedidoId = (int)($_POST['pedido_id'] ?? 0);
+            if (!$pedidoId) jsonResp(['success'=>false,'message'=>'ID inválido.']);
+
+            // Garante que é o dono e que o PIX ainda não foi confirmado
+            $chk = $pdo->prepare("SELECT id FROM pedidos WHERE id=? AND cliente_id=? AND pix_pago=0");
+            $chk->execute([$pedidoId, clienteId()]);
+            if (!$chk->fetch()) jsonResp(['success'=>false,'message'=>'Pedido não encontrado ou já pago.']);
+
+            $pdo->prepare("DELETE FROM pedido_itens WHERE pedido_id=?")->execute([$pedidoId]);
+            $pdo->prepare("DELETE FROM pedidos WHERE id=? AND pix_pago=0")->execute([$pedidoId]);
+            jsonResp(['success'=>true]);
+            break;
+
+        // ── FINALIZAR PEDIDO (legado — mantido para compatibilidade) ─
         case 'pedido_criar':
             if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Faça login para finalizar.'],401);
             $itens = json_decode($_POST['itens'] ?? '[]', true);

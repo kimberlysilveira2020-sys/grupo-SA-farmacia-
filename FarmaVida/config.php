@@ -20,6 +20,14 @@ class Config {
     const SENHA_SUPERVISOR_MESTRA = 'farmacia_VS';
     const ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png'];
 
+    // ── Configurações PIX ──────────────────────────────────────────
+    // Preencha com os dados da sua conta PIX
+    const PIX_CHAVE       = 'farmaciavidasaudavel@email.com'; // Chave PIX: CPF, CNPJ, e-mail, telefone ou chave aleatória
+    const PIX_NOME        = 'FARMACIA VIDA SAUDAVEL';         // Nome do recebedor (máx 25 chars)
+    const PIX_CIDADE      = 'SAO PAULO';                      // Cidade do recebedor (máx 15 chars)
+    const PIX_IDENTIFICADOR = 'FARMAVIDA';                    // Identificador da loja no QR Code (máx 25 chars)
+    // ──────────────────────────────────────────────────────────────
+
     public static function initApp() {
         if (self::DEBUG) {
             ini_set('display_errors', 1);

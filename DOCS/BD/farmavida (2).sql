@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 09/06/2026 às 03:11
+-- Tempo de geração: 23/06/2026 às 03:15
 -- Versão do servidor: 10.4.32-MariaDB
 -- Versão do PHP: 8.2.12
 
@@ -69,6 +69,39 @@ CREATE TABLE `caixa` (
 -- --------------------------------------------------------
 
 --
+-- Estrutura para tabela `categorias`
+--
+
+CREATE TABLE `categorias` (
+  `id` int(11) NOT NULL,
+  `nome` varchar(100) NOT NULL,
+  `icone` varchar(50) DEFAULT 'bi-tag',
+  `ativo` tinyint(1) DEFAULT 1,
+  `ordem` int(11) DEFAULT 0,
+  `criado_em` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Despejando dados para a tabela `categorias`
+--
+
+INSERT INTO `categorias` (`id`, `nome`, `icone`, `ativo`, `ordem`, `criado_em`) VALUES
+(1, 'Comum', 'bi-capsule', 1, 1, '2026-06-22 20:06:08'),
+(2, 'Genérico', 'bi-capsule-pill', 1, 2, '2026-06-22 20:06:08'),
+(3, 'Controlado', 'bi-shield-lock', 1, 3, '2026-06-22 20:06:08'),
+(4, 'Antibiótico', 'bi-bacteria', 1, 4, '2026-06-22 20:06:08'),
+(5, 'Vitaminas', 'bi-heart', 1, 5, '2026-06-22 20:06:08'),
+(6, 'Suplementos', 'bi-activity', 1, 6, '2026-06-22 20:06:08'),
+(7, 'Dermocosméticos', 'bi-stars', 1, 7, '2026-06-22 20:06:08'),
+(8, 'Higiene', 'bi-droplet', 1, 8, '2026-06-22 20:06:08'),
+(9, 'Beleza', 'bi-flower1', 1, 9, '2026-06-22 20:06:08'),
+(10, 'Infantil', 'bi-emoji-smile', 1, 10, '2026-06-22 20:06:08'),
+(11, 'Ortopédico', 'bi-bandaid', 1, 11, '2026-06-22 20:06:08'),
+(12, 'Hospitalar', 'bi-hospital', 1, 12, '2026-06-22 20:06:08');
+
+-- --------------------------------------------------------
+
+--
 -- Estrutura para tabela `clientes`
 --
 
@@ -129,13 +162,6 @@ CREATE TABLE `itens_pedido_loja` (
   `preco` decimal(10,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Despejando dados para a tabela `itens_pedido_loja`
---
-
-INSERT INTO `itens_pedido_loja` (`id`, `pedido_id`, `produto_id`, `quantidade`, `preco`) VALUES
-(1, 1, 2, 1, 8.00);
-
 -- --------------------------------------------------------
 
 --
@@ -150,13 +176,6 @@ CREATE TABLE `itens_venda` (
   `quantidade` int(11) NOT NULL,
   `preco` decimal(10,2) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Despejando dados para a tabela `itens_venda`
---
-
-INSERT INTO `itens_venda` (`id`, `venda_id`, `produto_id`, `lote_id`, `quantidade`, `preco`) VALUES
-(1, 1, 2, 2, 1, 8.00);
 
 -- --------------------------------------------------------
 
@@ -178,7 +197,37 @@ CREATE TABLE `lotes` (
 --
 
 INSERT INTO `lotes` (`id`, `produto_id`, `numero_lote`, `data_validade`, `qtd_atual`, `qtd_inicial`) VALUES
-(2, 2, '2', '2026-06-04', 9, 10);
+(29, 61, '10', '2026-07-10', 10, 10),
+(30, 62, 'INF-001', '2027-06-30', 50, 50),
+(31, 63, 'INF-002', '2027-08-31', 40, 40),
+(32, 64, 'INF-003', '2027-12-31', 60, 60),
+(33, 65, 'INF-004', '2027-03-31', 80, 80),
+(34, 66, 'INF-005', '2027-09-30', 45, 45),
+(35, 67, 'INF-006', '2027-11-30', 55, 55),
+(36, 68, 'INF-007', '2027-07-31', 70, 70),
+(37, 69, 'INF-008', '2028-01-31', 35, 35),
+(38, 70, 'INF-009', '2027-05-31', 30, 30),
+(39, 71, 'INF-010', '2027-10-31', 50, 50),
+(40, 72, 'ORT-001', '2027-06-30', 40, 40),
+(41, 73, 'ORT-002', '2027-08-31', 35, 35),
+(42, 74, 'ORT-003', '2027-12-31', 60, 60),
+(43, 75, 'ORT-004', '2028-06-30', 10, 10),
+(44, 76, 'ORT-005', '2028-12-31', 20, 20),
+(45, 77, 'ORT-006', '2028-12-31', 15, 15),
+(46, 78, 'ORT-007', '2028-12-31', 12, 12),
+(47, 79, 'ORT-008', '2028-12-31', 18, 18),
+(48, 80, 'ORT-009', '2028-06-30', 8, 8),
+(49, 81, 'ORT-010', '2027-10-31', 30, 30),
+(50, 82, 'HOS-001', '2027-06-30', 20, 20),
+(51, 83, 'HOS-002', '2027-12-31', 100, 100),
+(52, 84, 'HOS-003', '2027-12-31', 50, 50),
+(53, 85, 'HOS-004', '2027-09-30', 25, 25),
+(54, 86, 'HOS-005', '2027-08-31', 15, 15),
+(55, 87, 'HOS-006', '2027-06-30', 30, 30),
+(56, 88, 'HOS-007', '2027-12-31', 100, 100),
+(57, 89, 'HOS-008', '2028-06-30', 20, 20),
+(58, 90, 'HOS-009', '2027-12-31', 40, 40),
+(59, 91, 'HOS-010', '2028-06-30', 15, 15);
 
 -- --------------------------------------------------------
 
@@ -191,6 +240,9 @@ CREATE TABLE `pedidos` (
   `cliente_id` int(11) NOT NULL,
   `status` enum('pendente','confirmado','cancelado') DEFAULT 'pendente',
   `total` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `forma_pagamento` enum('credito','pix','paypal','boleto') DEFAULT 'pix',
+  `pix_txid` varchar(50) DEFAULT NULL,
+  `pix_pago` tinyint(1) NOT NULL DEFAULT 0,
   `criado_em` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -198,8 +250,13 @@ CREATE TABLE `pedidos` (
 -- Despejando dados para a tabela `pedidos`
 --
 
-INSERT INTO `pedidos` (`id`, `cliente_id`, `status`, `total`, `criado_em`) VALUES
-(1, 1, 'pendente', 8.00, '2026-06-08 19:51:33');
+INSERT INTO `pedidos` (`id`, `cliente_id`, `status`, `total`, `forma_pagamento`, `pix_txid`, `pix_pago`, `criado_em`) VALUES
+(8, 1, 'pendente', 29.90, 'pix', NULL, 0, '2026-06-22 21:38:49'),
+(9, 1, 'pendente', 74.90, 'pix', NULL, 0, '2026-06-22 21:49:11'),
+(10, 1, 'pendente', 18.90, 'pix', 'FV9DB502F21984', 0, '2026-06-22 22:03:12'),
+(11, 1, 'pendente', 8.00, 'pix', 'FV9DC11164D757', 0, '2026-06-22 22:06:25'),
+(12, 1, 'pendente', 159.90, 'pix', 'FV9DC266927657', 0, '2026-06-22 22:06:46'),
+(14, 1, 'pendente', 159.90, 'pix', 'FV9DC9A9B4E893', 0, '2026-06-22 22:08:42');
 
 -- --------------------------------------------------------
 
@@ -215,13 +272,6 @@ CREATE TABLE `pedidos_loja` (
   `observacao` text DEFAULT NULL,
   `criado_em` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Despejando dados para a tabela `pedidos_loja`
---
-
-INSERT INTO `pedidos_loja` (`id`, `cliente_id`, `status`, `total`, `observacao`, `criado_em`) VALUES
-(1, 2, 'pendente', 8.00, NULL, '2026-06-03 22:12:18');
 
 -- --------------------------------------------------------
 
@@ -242,7 +292,12 @@ CREATE TABLE `pedido_itens` (
 --
 
 INSERT INTO `pedido_itens` (`id`, `pedido_id`, `produto_id`, `quantidade`, `preco`) VALUES
-(1, 1, 2, 1, 8.00);
+(8, 8, 66, 1, 29.90),
+(9, 9, 79, 1, 74.90),
+(10, 10, 85, 1, 18.90),
+(11, 11, 61, 1, 8.00),
+(12, 12, 75, 1, 159.90),
+(14, 14, 75, 1, 159.90);
 
 -- --------------------------------------------------------
 
@@ -267,9 +322,37 @@ CREATE TABLE `produtos` (
 --
 
 INSERT INTO `produtos` (`id`, `nome`, `fabricante`, `categoria`, `preco_venda`, `descricao`, `foto`, `receita_obrigatoria`, `ativo`) VALUES
-(2, 'caio', 'FarmaVida', 'Comum', 8.00, 'Gostoso', 'img_6a20a59e63fd71.74401529.png', 0, 0),
-(25, 'Benzetacil', 'FarmaVida', 'Controlado', 10.00, '', 'img_6a2765d04248c5.37720560.webp', 0, 1),
-(26, 'Dipirona', 'FarmaVida', 'Comum', 10.00, '', 'img_6a2765db48cd59.55974094.webp', 0, 1);
+(61, 'Dipirona', 'FarmaVida', 'Comum', 10.00, '', 'img_6a39bbbd6c4c08.10849010.webp', 0, 1),
+(62, 'Paracetamol Infantil Gotas 100mg/mL', 'EMS', 'Infantil', 12.90, 'Analgésico e antitérmico em gotas para crianças. Frasco 15mL.', NULL, 0, 1),
+(63, 'Ibuprofeno Infantil Suspensão 50mg/mL', 'Medley', 'Infantil', 18.50, 'Anti-inflamatório infantil em suspensão oral. Frasco 120mL.', NULL, 0, 1),
+(64, 'Vitassay C Mastigável 100mg', 'Legrand', 'Infantil', 22.90, 'Vitamina C mastigável sabor laranja para crianças. Caixa com 30 comp.', NULL, 0, 1),
+(65, 'Soro Fisiológico Nasal Infantil', 'Novafito', 'Infantil', 8.90, 'Solução salina isotônica para higiene nasal. Kit com 30 ampolas 5mL.', NULL, 0, 1),
+(66, 'Bepantol Baby Pomada', 'Bayer', 'Infantil', 29.90, 'Pomada preventiva e tratadora de assaduras. 30g.', NULL, 0, 1),
+(67, 'Calcitran D3 Gotas', 'Sanavita', 'Infantil', 34.90, 'Suplemento de cálcio e vitamina D3 em gotas para crianças. 30mL.', NULL, 0, 1),
+(68, 'Espasmo Bebê Gotas', 'União Química', 'Infantil', 14.50, 'Antiespasmódico para cólicas infantis. Frasco 20mL.', NULL, 0, 1),
+(69, 'Addera D3 400UI Gotas', 'Sanofi', 'Infantil', 27.90, 'Suplemento de vitamina D3 para bebês e crianças. Frasco 10mL.', NULL, 0, 1),
+(70, 'Floratil Baby 200mg Sachê', 'Merck', 'Infantil', 38.90, 'Probiótico para reequilíbrio da flora intestinal. Caixa com 10 sachês.', NULL, 0, 1),
+(71, 'Histadin Pediátrico Xarope', 'Marjan', 'Infantil', 19.90, 'Xarope antialérgico para crianças. Frasco 120mL.', NULL, 0, 1),
+(72, 'Voltaren Emulgel 1% 60g', 'Novartis', 'Ortopédico', 42.90, 'Anti-inflamatório tópico para dores musculares e articulares. Bisnaga 60g.', NULL, 0, 1),
+(73, 'Profenid Gel 2,5% 60g', 'Sanofi', 'Ortopédico', 38.50, 'Cetoprofeno gel para alívio de dores e inflamações locais. Bisnaga 60g.', NULL, 0, 1),
+(74, 'Cataflan 50mg', 'Novartis', 'Ortopédico', 24.90, 'Diclofenaco potássico anti-inflamatório. Caixa com 20 comprimidos.', NULL, 0, 1),
+(75, 'Bengala Regulável Alumínio', 'Carci', 'Ortopédico', 159.90, 'Bengala dobrável em alumínio com 4 pés antiderrapantes. Regulagem de altura.', NULL, 0, 1),
+(76, 'Tornozeleira Elástica Neoprene M', 'Ortho Pauher', 'Ortopédico', 49.90, 'Suporte compressivo para tornozelo em neoprene. Tamanho M.', NULL, 0, 1),
+(77, 'Joelheira com Abertura Patelar M', 'Corflex', 'Ortopédico', 59.90, 'Joelheira elástica com abertura patelar para suporte e compressão. Tamanho M.', NULL, 0, 1),
+(78, 'Órtese Imobilizadora de Punho', 'Dyna', 'Ortopédico', 89.90, 'Imobilizador de punho com talas removíveis. Tamanho único ajustável.', NULL, 0, 1),
+(79, 'Cinto Lombar Elástico G', 'Saúde Life', 'Ortopédico', 74.90, 'Cinto lombar com barbatanas para suporte vertebral. Tamanho G.', NULL, 0, 1),
+(80, 'Muleta Axilar Alumínio Par', 'Carci', 'Ortopédico', 189.90, 'Par de muletas axilares em alumínio com regulagem de altura. Capacidade 120kg.', NULL, 0, 1),
+(81, 'Gel para Ultrassom 1kg', 'Carbogel', 'Ortopédico', 32.90, 'Gel condutor para aparelhos de ultrassom fisioterapêutico. Pote 1kg.', NULL, 0, 1),
+(82, 'Luva Procedimento Látex M Caixa 100', '3M', 'Hospitalar', 49.90, 'Luvas de látex sem pó para procedimentos. Caixa com 100 unidades. Tamanho M.', NULL, 0, 1),
+(83, 'Seringa 5mL Bico Luer Lock', 'BD', 'Hospitalar', 2.90, 'Seringa descartável 5mL com bico Luer Lock. Unidade.', NULL, 0, 1),
+(84, 'Agulha 40x12 Caixa 100', 'Descarpack', 'Hospitalar', 19.90, 'Agulhas hipodérmicas 40x12mm descartáveis. Caixa com 100 unidades.', NULL, 0, 1),
+(85, 'Curativo Tegaderm 10x12cm', '3M', 'Hospitalar', 18.90, 'Filme transparente para curativo com borda adesiva. Caixa com 5 unidades.', NULL, 0, 1),
+(86, 'Esparadrapo Impermeável 10mx5cm', 'Missner', 'Hospitalar', 14.90, 'Esparadrapo impermeável bege. Rolo 10mx5cm.', NULL, 0, 1),
+(87, 'Álcool 70% Líquido 1L', 'Rioquímica', 'Hospitalar', 19.90, 'Álcool etílico hidratado 70% INPM para antissepsia. Frasco 1L.', NULL, 0, 1),
+(88, 'Atadura de Crepe 10cm x 1,8m', 'Neve', 'Hospitalar', 3.90, 'Atadura de crepe 10cm de largura. Rolo de 1,8m. Unitário.', NULL, 0, 1),
+(89, 'Termômetro Digital Axilar', 'G-Tech', 'Hospitalar', 29.90, 'Termômetro digital com alarme sonoro. Resultado em 60 segundos.', NULL, 0, 1),
+(90, 'Máscara Cirúrgica Tripla Cx 50', 'Descarpack', 'Hospitalar', 24.90, 'Máscara descartável tripla camada com elástico. Caixa com 50 unidades.', NULL, 0, 1),
+(91, 'Oxímetro de Pulso Digital', 'G-Tech', 'Hospitalar', 89.90, 'Oxímetro portátil para medição de SpO2 e frequência cardíaca. Pilha inclusa.', NULL, 0, 1);
 
 -- --------------------------------------------------------
 
@@ -313,13 +396,6 @@ CREATE TABLE `vendas` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
--- Despejando dados para a tabela `vendas`
---
-
-INSERT INTO `vendas` (`id`, `usuario_id`, `cliente_id`, `caixa_id`, `total`, `data_venda`, `supervisor_liberacao`) VALUES
-(1, 4, NULL, NULL, 8.00, '2026-06-03 19:08:19', NULL);
-
---
 -- Índices para tabelas despejadas
 --
 
@@ -335,6 +411,13 @@ ALTER TABLE `banners`
 ALTER TABLE `caixa`
   ADD PRIMARY KEY (`id`),
   ADD KEY `usuario_id` (`usuario_id`);
+
+--
+-- Índices de tabela `categorias`
+--
+ALTER TABLE `categorias`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `nome` (`nome`);
 
 --
 -- Índices de tabela `clientes`
@@ -381,7 +464,8 @@ ALTER TABLE `lotes`
 --
 ALTER TABLE `pedidos`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `cliente_id` (`cliente_id`);
+  ADD KEY `cliente_id` (`cliente_id`),
+  ADD KEY `idx_pix_txid` (`pix_txid`);
 
 --
 -- Índices de tabela `pedidos_loja`
@@ -403,7 +487,8 @@ ALTER TABLE `pedido_itens`
 --
 ALTER TABLE `produtos`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `uq_nome_fabricante` (`nome`,`fabricante`);
+  ADD UNIQUE KEY `uq_produto_ativo` (`nome`,`fabricante`,`ativo`),
+  ADD UNIQUE KEY `idx_nome_fabricante_ativo` (`nome`,`fabricante`,`ativo`);
 
 --
 -- Índices de tabela `usuarios`
@@ -436,6 +521,12 @@ ALTER TABLE `caixa`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de tabela `categorias`
+--
+ALTER TABLE `categorias`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+
+--
 -- AUTO_INCREMENT de tabela `clientes`
 --
 ALTER TABLE `clientes`
@@ -463,13 +554,13 @@ ALTER TABLE `itens_venda`
 -- AUTO_INCREMENT de tabela `lotes`
 --
 ALTER TABLE `lotes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=60;
 
 --
 -- AUTO_INCREMENT de tabela `pedidos`
 --
 ALTER TABLE `pedidos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT de tabela `pedidos_loja`
@@ -481,13 +572,13 @@ ALTER TABLE `pedidos_loja`
 -- AUTO_INCREMENT de tabela `pedido_itens`
 --
 ALTER TABLE `pedido_itens`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT de tabela `produtos`
 --
 ALTER TABLE `produtos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=27;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
 
 --
 -- AUTO_INCREMENT de tabela `usuarios`

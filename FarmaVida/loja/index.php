@@ -742,13 +742,9 @@ button { cursor:pointer; font-family:inherit; }
 </header>
 
 <!-- NAV CATEGORIAS -->
-<nav class="cat-nav">
-    <a href="#" class="ativo" onclick="filtrarCategoria('',this)">Todos</a>
-    <a href="#" onclick="filtrarCategoria('Comum',this)"><i class="bi bi-capsule"></i> Medicamentos</a>
-    <a href="#" onclick="filtrarCategoria('Dermocosméticos',this)"><i class="bi bi-stars"></i> Dermocosméticos</a>
-    <a href="#" onclick="filtrarCategoria('Higiene',this)"><i class="bi bi-droplet"></i> Higiene</a>
-    <a href="#" onclick="filtrarCategoria('Vitaminas',this)"><i class="bi bi-heart"></i> Vitaminas</a>
-    <a href="#" onclick="filtrarCategoria('Beleza',this)"><i class="bi bi-flower1"></i> Beleza</a>
+<nav class="cat-nav" id="cat-nav">
+    <a href="#" class="ativo" onclick="filtrarCategoria('',this)" data-cat="">Todos</a>
+    <!-- categorias carregadas via JS -->
 </nav>
 
 <!-- CONTEÚDO PRINCIPAL -->
@@ -844,10 +840,12 @@ button { cursor:pointer; font-family:inherit; }
         </div>
         <div class="footer-col">
             <h4>Categorias</h4>
-            <a href="#" onclick="filtrarCategoria('Comum',null)">Medicamentos</a>
-            <a href="#" onclick="filtrarCategoria('Vitaminas',null)">Vitaminas</a>
-            <a href="#" onclick="filtrarCategoria('Higiene',null)">Higiene Pessoal</a>
-            <a href="#" onclick="filtrarCategoria('Beleza',null)">Beleza</a>
+            <div id="footer-cats">
+                <a href="#" onclick="filtrarCategoria('Comum',null);return false;">Medicamentos</a>
+                <a href="#" onclick="filtrarCategoria('Vitaminas',null);return false;">Vitaminas</a>
+                <a href="#" onclick="filtrarCategoria('Higiene',null);return false;">Higiene</a>
+                <a href="#" onclick="filtrarCategoria('Beleza',null);return false;">Beleza</a>
+            </div>
         </div>
     </div>
     <div class="footer-bottom">
@@ -936,6 +934,85 @@ button { cursor:pointer; font-family:inherit; }
     </div>
 </div>
 
+<!-- ══ MODAL FORMA DE PAGAMENTO ══ -->
+<div class="modal-overlay" id="modal-pagamento">
+    <div class="modal-box" style="max-width:420px;">
+        <div class="modal-box__header">
+            <h3><i class="bi bi-credit-card"></i> Como deseja pagar?</h3>
+            <button onclick="fecharModal('pagamento')"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-box__body" style="padding:24px 20px;">
+            <p style="color:#666;font-size:.88rem;margin-bottom:18px;text-align:center;">
+                Selecione a forma de pagamento para o seu pedido.
+            </p>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+
+                <!-- PIX -->
+                <button onclick="selecionarPagamento('pix')" style="
+                    display:flex;align-items:center;gap:16px;
+                    background:#f1faf5;border:2px solid #1daa5c;border-radius:12px;
+                    padding:16px 18px;cursor:pointer;transition:background .15s;text-align:left;">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo%E2%80%94pix_powered_by_Banco_Central_%28Brazil%2C_2020%29.svg"
+                         alt="PIX" style="width:52px;flex-shrink:0;">
+                    <div>
+                        <div style="font-weight:700;color:#128446;font-size:.95rem;">PIX</div>
+                        <div style="font-size:.78rem;color:#555;margin-top:2px;">Pagamento instantâneo — QR Code gerado na hora</div>
+                    </div>
+                    <i class="bi bi-chevron-right" style="margin-left:auto;color:#1daa5c;"></i>
+                </button>
+
+                <!-- Pagar na retirada -->
+                <button onclick="selecionarPagamento('retirada')" style="
+                    display:flex;align-items:center;gap:16px;
+                    background:#f5f5f5;border:2px solid #bdbdbd;border-radius:12px;
+                    padding:16px 18px;cursor:pointer;transition:background .15s;text-align:left;">
+                    <i class="bi bi-shop" style="font-size:2rem;color:#555;flex-shrink:0;width:52px;text-align:center;"></i>
+                    <div>
+                        <div style="font-weight:700;color:#333;font-size:.95rem;">Pagar na Retirada</div>
+                        <div style="font-size:.78rem;color:#555;margin-top:2px;">Pague em dinheiro ou cartão ao retirar na farmácia</div>
+                    </div>
+                    <i class="bi bi-chevron-right" style="margin-left:auto;color:#aaa;"></i>
+                </button>
+
+            </div>
+            <div id="fb-pagamento" style="margin-top:14px;"></div>
+        </div>
+    </div>
+</div>
+<style>
+#modal-pagamento .modal-box__body button:hover { filter:brightness(.96); }
+</style>
+
+<!-- ══ MODAL PIX ══ -->
+<div class="modal-overlay" id="modal-pix">
+    <div class="modal-box" style="max-width:480px;">
+        <div class="modal-box__header" style="background:linear-gradient(135deg,#1daa5c,#128446);color:#fff;">
+            <h3><i class="bi bi-qr-code"></i> Pagar com PIX</h3>
+            <button onclick="tentarFecharPix()" style="color:#fff;"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="modal-box__body" id="pix-body" style="text-align:center;padding:28px 20px;">
+            <div class="spinner" style="margin:30px auto;width:36px;height:36px;border-color:#1daa5c;border-top-color:transparent;"></div>
+            <p style="color:#666;margin-top:12px;">Gerando QR Code...</p>
+        </div>
+    </div>
+</div>
+<style>
+#pix-body .pix-valor    { font-size:2rem;font-weight:800;color:#128446;margin:4px 0 18px; }
+#pix-body .pix-qr       { display:inline-block;padding:14px;background:#fff;border:2px solid #e0e0e0;border-radius:12px;margin-bottom:16px; }
+#pix-body .pix-copiacola{ width:100%;background:#f5f5f5;border:1px dashed #aaa;border-radius:8px;
+                           padding:10px 12px;font-size:.72rem;word-break:break-all;
+                           color:#333;cursor:pointer;text-align:left;transition:background .2s; }
+#pix-body .pix-copiacola:hover { background:#e8f5e9; }
+#pix-body .btn-copiar   { margin-top:10px;width:100%;background:#1daa5c;color:#fff;border:none;
+                           border-radius:8px;padding:11px;font-weight:700;font-size:.9rem;cursor:pointer; }
+#pix-body .btn-copiar:hover { background:#128446; }
+#pix-body .pix-instrucoes{ font-size:.78rem;color:#666;line-height:1.6;margin-top:14px;text-align:left; }
+#pix-body .pix-pedido   { font-size:.8rem;color:#888;margin-bottom:4px; }
+#pix-body .pix-ok-btn   { width:100%;margin-top:18px;background:#e8f5e9;color:#1b5e20;
+                           border:1.5px solid #1daa5c;border-radius:8px;padding:10px;
+                           font-weight:700;cursor:pointer; }
+</style>
+
 <!-- ══ MODAL MEUS PEDIDOS ══ -->
 <div class="modal-overlay" id="modal-pedidos">
     <div class="modal-box" style="max-width:560px;">
@@ -952,6 +1029,7 @@ button { cursor:pointer; font-family:inherit; }
 <!-- ══ TOASTS ══ -->
 <div class="toast-wrap" id="toast-wrap"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 // ════════════════════════════════════════════════════
 // ESTADO
@@ -970,6 +1048,7 @@ let bannerTimer = null;
 // INIT
 // ════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+    carregarCategorias();
     carregarBanners();
     carregarProdutos();
     atualizarCarrinho();
@@ -984,6 +1063,40 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch(err) { console.error('Erro ao parsear produto', err); }
     });
 });
+
+// ════════════════════════════════════════════════════
+// CATEGORIAS
+// ════════════════════════════════════════════════════
+async function carregarCategorias() {
+    try {
+        const r = await fetch('loja_api.php?endpoint=categorias');
+        const d = await r.json();
+        if (!d.success || !d.categorias.length) return;
+
+        const nav = document.getElementById('cat-nav');
+        // Remove links antigos exceto "Todos"
+        nav.querySelectorAll('a[data-cat]').forEach(a => { if (a.dataset.cat !== '') a.remove(); });
+
+        d.categorias.forEach(c => {
+            const a = document.createElement('a');
+            a.href = '#';
+            a.dataset.cat = c.nome;
+            a.innerHTML = `<i class="bi ${c.icone || 'bi-tag'}"></i> ${c.nome}`;
+            a.onclick = function(e) { e.preventDefault(); filtrarCategoria(c.nome, this); };
+            nav.appendChild(a);
+        });
+
+        // Atualiza links do footer
+        const footerCats = document.getElementById('footer-cats');
+        if (footerCats) {
+            footerCats.innerHTML = d.categorias.slice(0,6).map(c =>
+                `<a href="#" onclick="filtrarCategoria('${c.nome.replace(/'/g,"\\'")}',null);return false;">
+                    <i class="bi ${c.icone||'bi-tag'}"></i> ${c.nome}
+                </a>`
+            ).join('');
+        }
+    } catch(e) { console.warn('Categorias: ', e); }
+}
 
 // ════════════════════════════════════════════════════
 // BANNERS
@@ -1222,29 +1335,220 @@ function fecharCarrinho() {
 // ════════════════════════════════════════════════════
 // CHECKOUT
 // ════════════════════════════════════════════════════
-async function checkout() {
+// ── Estado do PIX ──────────────────────────────────────────────────
+let pixPedidoId   = null;  // ID do pedido aguardando pagamento
+let pixConfirmado = false;  // true somente quando o usuário clica "Já paguei"
+let _ultimoPix    = null;   // cache dos dados para restaurar o QR Code
+let _itensCheckout = [];    // itens pendentes até a forma de pagamento ser escolhida
+
+// Passo 1: Finalizar Pedido → abre seleção de pagamento
+function checkout() {
     if (!CLIENTE_LOGADO) {
         fecharCarrinho();
         abrirModal('login');
         toast('Faça login para finalizar seu pedido', true);
         return;
     }
-
     if (!carrinho.length) return;
-    const itens = carrinho.map(i=>({produto_id:i.id,quantidade:i.quantidade,preco:i.preco_venda}));
-    const fd = new FormData();
-    fd.append('itens', JSON.stringify(itens));
 
+    // Guarda os itens e abre o seletor de pagamento
+    _itensCheckout = carrinho.map(i=>({produto_id:i.id,quantidade:i.quantidade,preco:i.preco_venda}));
+    fecharCarrinho();
+    document.getElementById('fb-pagamento').innerHTML = '';
+    abrirModal('pagamento');
+}
+
+// Passo 2: usuário escolhe a forma — dispara o fluxo certo
+async function selecionarPagamento(forma) {
+    fecharModal('pagamento');
+
+    if (forma === 'pix') {
+        await iniciarFluxoPix();
+    } else {
+        await finalizarPedidoRetirada();
+    }
+}
+
+// Fluxo PIX — gera QR Code
+async function iniciarFluxoPix() {
+    // Reseta estado
+    pixPedidoId   = null;
+    pixConfirmado = false;
+
+    // Abre modal PIX com loading
+    document.getElementById('pix-body').innerHTML = `
+        <div class="spinner" style="margin:30px auto;width:36px;height:36px;border-color:#1daa5c;border-top-color:transparent;"></div>
+        <p style="color:#666;margin-top:12px;">Gerando QR Code...</p>`;
+    document.getElementById('modal-pix').classList.add('aberto');
+
+    const fd = new FormData();
+    fd.append('itens', JSON.stringify(_itensCheckout));
+
+    try {
+        const r = await fetch('loja_api.php?endpoint=gerar_pix',{method:'POST',body:fd});
+        const d = await r.json();
+        if (d.success) {
+            pixPedidoId = d.pedido_id;
+            renderizarPix(d);
+            carrinho = []; salvarCarrinho(); atualizarCarrinho();
+        } else {
+            document.getElementById('pix-body').innerHTML =
+                `<div style="color:#c62828;padding:20px 16px;">
+                    <i class="bi bi-exclamation-triangle-fill"></i> ${d.message}
+                    <button class="pix-ok-btn" style="margin-top:14px;background:#fce4e4;color:#c62828;border-color:#f44336;"
+                            onclick="fecharPixSemPagamento()">Fechar</button>
+                 </div>`;
+        }
+    } catch(e) {
+        document.getElementById('pix-body').innerHTML =
+            `<div style="color:#c62828;padding:20px 16px;">
+                <i class="bi bi-exclamation-triangle-fill"></i> Erro ao gerar PIX. Tente novamente.
+                <button class="pix-ok-btn" style="margin-top:14px;background:#fce4e4;color:#c62828;border-color:#f44336;"
+                        onclick="fecharPixSemPagamento()">Fechar</button>
+             </div>`;
+    }
+}
+
+// Fluxo Retirada — cria pedido direto, sem PIX
+async function finalizarPedidoRetirada() {
+    const fd = new FormData();
+    fd.append('itens', JSON.stringify(_itensCheckout));
     try {
         const r = await fetch('loja_api.php?endpoint=pedido_criar',{method:'POST',body:fd});
         const d = await r.json();
         if (d.success) {
-            carrinho = []; salvarCarrinho(); atualizarCarrinho(); fecharCarrinho();
-            toast(`🎉 Pedido #${d.pedido_id} realizado com sucesso!`);
+            carrinho = []; salvarCarrinho(); atualizarCarrinho();
+            toast(`🎉 Pedido #${d.pedido_id} realizado! Pague ao retirar na farmácia.`);
         } else {
             toast(d.message, true);
         }
-    } catch(e) { toast('Erro ao finalizar pedido.', true); }
+    } catch(e) {
+        toast('Erro ao finalizar pedido. Tente novamente.', true);
+    }
+}
+
+function renderizarPix(d) {
+    _ultimoPix = d; // cache para poder restaurar o QR Code via "Voltar ao PIX"
+    const totalFmt = 'R$ ' + fmtBRL(d.total);
+    const body = document.getElementById('pix-body');
+    const payloadEscapado = d.payload.replace(/'/g, "\\'");
+
+    body.innerHTML = `
+        <p class="pix-pedido">Pedido <strong>#${d.pedido_id}</strong> — aguardando pagamento</p>
+        <p class="pix-valor">${totalFmt}</p>
+        <div class="pix-qr" id="pix-qr-canvas"></div>
+        <p style="font-size:.72rem;color:#888;margin-bottom:6px;">Ou copie o código Pix Copia e Cola:</p>
+        <div class="pix-copiacola" id="pix-cc" onclick="copiarPix(this,'${payloadEscapado}')"
+             title="Clique para copiar">${d.payload}</div>
+        <button class="btn-copiar" onclick="copiarPix(document.getElementById('pix-cc'),'${payloadEscapado}')">
+            <i class="bi bi-clipboard-check"></i> Copiar código PIX
+        </button>
+        <div class="pix-instrucoes">
+            <strong>Como pagar:</strong><br>
+            1. Abra o app do seu banco e acesse o PIX<br>
+            2. Escaneie o QR Code <strong>ou</strong> cole o código acima<br>
+            3. Confirme o valor de <strong>${totalFmt}</strong> e finalize
+        </div>
+        <div style="display:flex;gap:10px;margin-top:18px;">
+            <button class="pix-ok-btn" style="background:#fce4e4;color:#c62828;border-color:#f44336;flex:1;"
+                    onclick="fecharPixSemPagamento()">
+                <i class="bi bi-x-circle"></i> Cancelar pedido
+            </button>
+            <button class="pix-ok-btn" style="flex:1;" onclick="confirmarPagamentoPix()">
+                <i class="bi bi-check-circle"></i> Já paguei
+            </button>
+        </div>`;
+
+    new QRCode(document.getElementById('pix-qr-canvas'), {
+        text: d.payload,
+        width: 200,
+        height: 200,
+        correctLevel: QRCode.CorrectLevel.M
+    });
+}
+
+function copiarPix(el, payload) {
+    navigator.clipboard.writeText(payload).then(() => {
+        const orig = el.style.background;
+        el.style.background = '#c8e6c9';
+        setTimeout(()=>{ el.style.background = orig; }, 800);
+        toast('✅ Código PIX copiado!');
+    }).catch(()=>{
+        const ta = document.createElement('textarea');
+        ta.value = payload;
+        document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('✅ Código PIX copiado!');
+    });
+}
+
+// Usuário confirmou que pagou — fecha com sucesso
+function confirmarPagamentoPix() {
+    pixConfirmado = true;
+    document.getElementById('modal-pix').classList.remove('aberto');
+    toast('🎉 Pedido #' + pixPedidoId + ' confirmado! Aguardamos a compensação do PIX.');
+    pixPedidoId = null;
+}
+
+// Usuário fechou sem pagar — cancela o pedido no banco
+async function fecharPixSemPagamento() {
+    const idParaCancelar = pixPedidoId;
+    pixPedidoId   = null;
+    pixConfirmado = false;
+    document.getElementById('modal-pix').classList.remove('aberto');
+
+    if (idParaCancelar) {
+        const fd = new FormData();
+        fd.append('pedido_id', idParaCancelar);
+        try {
+            await fetch('loja_api.php?endpoint=cancelar_pix', {method:'POST', body:fd});
+        } catch(e) { /* silencioso — o pedido permanece pendente no banco */ }
+        toast('❌ Pedido cancelado. Nenhum valor foi cobrado.', true);
+    }
+}
+
+// Intercepta o clique no overlay (fora do modal) e o botão X
+document.addEventListener('DOMContentLoaded', () => {
+    const overlay = document.getElementById('modal-pix');
+
+    // Clique fora do modal-box
+    overlay.addEventListener('click', function(e) {
+        if (e.target === this) tentarFecharPix();
+    });
+});
+
+function tentarFecharPix() {
+    if (!pixPedidoId) {
+        // Nenhum pedido pendente — fecha normalmente
+        document.getElementById('modal-pix').classList.remove('aberto');
+        return;
+    }
+    // Existe pedido pendente — confirma com o usuário
+    const body = document.getElementById('pix-body');
+    body.innerHTML = `
+        <div style="text-align:center;padding:24px 12px;">
+            <i class="bi bi-exclamation-triangle-fill" style="font-size:2.8rem;color:#f5820d;"></i>
+            <h3 style="margin:14px 0 6px;font-size:1.1rem;">Pagamento não confirmado</h3>
+            <p style="color:#666;font-size:.88rem;margin-bottom:20px;">
+                O QR Code foi gerado mas ainda não confirmamos seu pagamento.<br>
+                Deseja <strong>cancelar</strong> o pedido ou <strong>voltar</strong> para finalizar o pagamento?
+            </p>
+            <div style="display:flex;gap:10px;">
+                <button class="pix-ok-btn"
+                        style="flex:1;background:#fce4e4;color:#c62828;border-color:#f44336;"
+                        onclick="fecharPixSemPagamento()">
+                    <i class="bi bi-trash3"></i> Cancelar pedido
+                </button>
+                <button class="pix-ok-btn" style="flex:1;" onclick="voltarParaQrCode()">
+                    <i class="bi bi-arrow-left-circle"></i> Voltar ao PIX
+                </button>
+            </div>
+        </div>`;
+}
+
+function voltarParaQrCode() {
+    if (_ultimoPix) renderizarPix(_ultimoPix);
 }
 
 // ════════════════════════════════════════════════════

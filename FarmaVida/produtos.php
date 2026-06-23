@@ -1,663 +1,667 @@
 <?php
 require_once 'config.php';
-
 if (!isset($_SESSION['usuario_id'])) { header("Location: login.php"); exit; }
 
 $pdo = Config::getDbConnection();
 
-// Consulta produtos — subquery evita duplicação por múltiplos lotes
-$stmt = $pdo->query("
-    SELECT p.id, p.nome, p.fabricante, p.categoria, p.foto,
-           p.preco_venda, p.descricao,
-           COALESCE(est.estoque_total, 0)               AS estoque_total,
-           est.validade_mais_proxima                     AS validade_mais_proxima,
-           DATEDIFF(est.validade_mais_proxima, CURDATE()) AS dias_para_vencer
-    FROM produtos p
-    LEFT JOIN (
-        SELECT produto_id,
-               SUM(qtd_atual)     AS estoque_total,
-               MIN(data_validade) AS validade_mais_proxima
-        FROM lotes
-        WHERE qtd_atual > 0
-        GROUP BY produto_id
-    ) est ON est.produto_id = p.id
-    WHERE COALESCE(p.ativo, 1) = 1
-    ORDER BY p.nome ASC
+// Garante tabela de categorias com dados padrão
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS `categorias` (
+      `id` int(11) NOT NULL AUTO_INCREMENT,
+      `nome` varchar(100) NOT NULL,
+      `icone` varchar(50) DEFAULT 'bi-tag',
+      `ativo` tinyint(1) DEFAULT 1,
+      `ordem` int(11) DEFAULT 0,
+      `criado_em` datetime DEFAULT current_timestamp(),
+      PRIMARY KEY (`id`),
+      UNIQUE KEY `nome` (`nome`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
 ");
-$produtos = $stmt->fetchAll();
 
-foreach ($produtos as &$produto) {
-    $dias = $produto['dias_para_vencer'];
-    if ($dias !== null && $dias <= 30) {
-        $produto['tem_desconto'] = true;
-        $produto['percentual_desconto'] = 20;
-        $produto['preco_original'] = $produto['preco_venda'];
-        $produto['preco_venda'] = round($produto['preco_venda'] * 0.80, 2);
-    } else {
-        $produto['tem_desconto'] = false;
-    }
+// Insere categorias padrão se a tabela estiver vazia
+$qtdCat = (int)$pdo->query("SELECT COUNT(*) FROM categorias")->fetchColumn();
+if ($qtdCat === 0) {
+    $pdo->exec("
+        INSERT IGNORE INTO `categorias` (`nome`, `icone`, `ordem`) VALUES
+        ('Comum', 'bi-capsule', 1),
+        ('Genérico', 'bi-capsule-pill', 2),
+        ('Controlado', 'bi-shield-lock', 3),
+        ('Antibiótico', 'bi-bacteria', 4),
+        ('Vitaminas', 'bi-heart', 5),
+        ('Suplementos', 'bi-activity', 6),
+        ('Dermocosméticos', 'bi-stars', 7),
+        ('Higiene', 'bi-droplet', 8),
+        ('Beleza', 'bi-flower1', 9),
+        ('Infantil', 'bi-emoji-smile', 10),
+        ('Ortopédico', 'bi-bandaid', 11),
+        ('Hospitalar', 'bi-hospital', 12)
+    ");
 }
 
-$page_title = "Gestão de Produtos"; 
-include 'header.php'; 
+// Busca categorias
+$categorias = $pdo->query("SELECT * FROM categorias WHERE ativo=1 ORDER BY ordem ASC, nome ASC")->fetchAll();
+
+// Busca produtos com estoque
+$busca    = trim($_GET['q'] ?? '');
+$catFiltro= trim($_GET['cat'] ?? '');
+$pagina   = max(1, (int)($_GET['p'] ?? 1));
+$por_pag  = Config::PRODUTOS_POR_PAGINA;
+$offset   = ($pagina - 1) * $por_pag;
+
+$where  = ["p.ativo = 1"];
+$params = [];
+if ($busca)    { $where[] = "(p.nome LIKE ? OR p.fabricante LIKE ?)"; $params[] = "%$busca%"; $params[] = "%$busca%"; }
+if ($catFiltro){ $where[] = "p.categoria = ?"; $params[] = $catFiltro; }
+$whereSQL = 'WHERE ' . implode(' AND ', $where);
+
+$total = (int)$pdo->prepare("SELECT COUNT(*) FROM produtos p $whereSQL")->execute($params) ? 0 : 0;
+$stC = $pdo->prepare("SELECT COUNT(*) FROM produtos p $whereSQL");
+$stC->execute($params);
+$total = (int)$stC->fetchColumn();
+$totalPags = max(1, ceil($total / $por_pag));
+
+$stP = $pdo->prepare("
+    SELECT p.id, p.nome, p.fabricante, p.categoria, p.preco_venda, p.receita_obrigatoria, p.foto,
+           COALESCE(SUM(l.qtd_atual),0) AS estoque_total,
+           COUNT(l.id) AS num_lotes
+    FROM produtos p
+    LEFT JOIN lotes l ON l.produto_id = p.id AND l.qtd_atual > 0
+    $whereSQL
+    GROUP BY p.id
+    ORDER BY p.nome ASC
+    LIMIT $por_pag OFFSET $offset
+");
+$stP->execute($params);
+$produtos = $stP->fetchAll();
+
+$page_title = "Estoque / Produtos";
+include 'header.php';
 ?>
+
+<style>
+.prod-table th { vertical-align: middle; white-space: nowrap; }
+.prod-table td { vertical-align: middle; }
+.badge-ctrl  { background:#ff9800; color:#fff; }
+.badge-sem   { background:#e53935; color:#fff; }
+.badge-ok    { background:#2e7d32; color:#fff; }
+.foto-thumb  { width:48px;height:48px;object-fit:cover;border-radius:8px;background:#f0f0f0; }
+.foto-ph     { width:48px;height:48px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:1.3rem; }
+
+/* ── Modal categorias ── */
+#lista-cats .cat-item {
+    display:flex;align-items:center;gap:8px;padding:7px 10px;
+    border:1px solid #dee2e6;border-radius:8px;margin-bottom:6px;background:#f8f9fa;
+}
+#lista-cats .cat-item span { flex:1;font-weight:600; }
+#lista-cats .cat-item .btn-rm-cat {
+    background:none;border:none;color:#c62828;font-size:1.1rem;padding:0 4px;cursor:pointer;
+}
+#lista-cats .cat-item .btn-rm-cat:hover { color:#e53935; }
+
+.btn-add-cat-inline {
+    border:none;background:var(--bs-success);color:#fff;border-radius:6px;
+    width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:1rem;font-weight:700;cursor:pointer;margin-left:4px;vertical-align:middle;
+    transition:background .15s;
+}
+.btn-add-cat-inline:hover { background:#155724; }
+.btn-rm-cat-inline {
+    border:none;background:#e53935;color:#fff;border-radius:6px;
+    width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:1rem;font-weight:700;cursor:pointer;margin-left:2px;vertical-align:middle;
+    transition:background .15s;
+}
+.btn-rm-cat-inline:hover { background:#b71c1c; }
+
+.select-cat-wrap { display:inline-flex;align-items:center;gap:0; }
+.select-cat-wrap select { border-radius:6px 0 0 6px !important; }
+</style>
 
 <div class="container-fluid fade-in">
 
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>
-            <i class="bi bi-box-seam"></i> Gestão de Estoque e Produtos
-        </h2>
-        <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#modalNovoProduto">
-            <i class="bi bi-plus-circle"></i> Novo Produto
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h2 class="mb-0"><i class="bi bi-box-seam"></i> Estoque de Produtos</h2>
+        <button class="btn btn-success" onclick="abrirModalProduto(null)">
+            <i class="bi bi-plus-circle-fill"></i> Novo Produto
         </button>
     </div>
 
-    <?php if (!empty($produtos)): ?>
-    <div class="accordion" id="accordionProdutos">
-        <?php foreach ($produtos as $produto): ?>
-        <div class="accordion-item">
-            <h2 class="accordion-header" id="heading-<?= $produto['id'] ?>">
-                <button class="accordion-button collapsed" type="button"
-                    data-bs-target="#collapse-<?= $produto['id'] ?>">
-                    <span class="d-flex justify-content-between w-100 me-3 align-items-center">
-                        <span class="d-flex align-items-center gap-2">
-                            <?php if (!empty($produto['foto']) && file_exists('uploads/produtos/' . $produto['foto'])): ?>
-                            <img src="uploads/produtos/<?= htmlspecialchars($produto['foto']) ?>" 
-                                 alt="<?= htmlspecialchars($produto['nome']) ?>"
-                                 style="width:38px; height:38px; object-fit:cover; border-radius:6px; border:1px solid #dee2e6; cursor:zoom-in;"
-                                 onclick="abrirLightbox(this.src, '<?= htmlspecialchars($produto['nome'], ENT_QUOTES) ?>'); event.stopPropagation();">
-                            <?php else: ?>
-                            <div class="d-flex align-items-center justify-content-center rounded" 
-                                 style="width:38px;height:38px;background:#e9ecef;color:#6c757d;font-size:.9rem;">
-                                <i class="bi bi-image"></i>
-                            </div>
-                            <?php endif; ?>
-                            <span>
-                                <strong><?= htmlspecialchars($produto['nome']) ?></strong>
-                                <span class="badge bg-secondary ms-2"><?= htmlspecialchars($produto['fabricante']) ?></span>
-                                <?php if ($produto['categoria'] === 'Controlado'): ?>
-                                <span class="badge badge-controlado ms-1">Controlado</span>
-                                <?php endif; ?>
-                            </span>
-                        </span>
-                        <span class="d-flex gap-2 align-items-center">
-                            <span class="badge bg-success">R$ <?= number_format($produto['preco_venda'], 2, ',', '.') ?></span>
-                            <span class="badge bg-primary">Estoque: <?= $produto['estoque_total'] ?></span>
-                        </span>
-                    </span>
-                </button>
-            </h2>
-
-            <div id="collapse-<?= $produto['id'] ?>" class="accordion-collapse collapse">
-                <div class="accordion-body">
-
-                    <div class="row mb-3">
-                        <!-- Foto do produto -->
-                        <div class="col-md-2 text-center">
-                            <?php if (!empty($produto['foto']) && file_exists('uploads/produtos/' . $produto['foto'])): ?>
-                            <img src="uploads/produtos/<?= htmlspecialchars($produto['foto']) ?>"
-                                 alt="<?= htmlspecialchars($produto['nome']) ?>"
-                                 class="img-thumbnail" 
-                                 style="max-width:110px; max-height:110px; object-fit:cover; cursor:zoom-in;"
-                                 onclick="abrirLightbox(this.src, '<?= htmlspecialchars($produto['nome'], ENT_QUOTES) ?>')">
-                            <?php else: ?>
-                            <div class="d-flex align-items-center justify-content-center rounded border bg-light" 
-                                 style="width:110px;height:110px;margin:0 auto;color:#adb5bd;">
-                                <i class="bi bi-image" style="font-size:2.5rem;"></i>
-                            </div>
-                            <small class="text-muted d-block mt-1">Sem foto</small>
-                            <?php endif; ?>
-                        </div>
-                        <!-- Detalhes -->
-                        <div class="col-md-10">
-                            <div class="row g-2 mb-3">
-                                <div class="col-auto">
-                                    <span class="text-muted small">Preço:</span>
-                                    <strong class="text-success ms-1">R$ <?= number_format($produto['preco_venda'], 2, ',', '.') ?></strong>
-                                    <?php if ($produto['tem_desconto']): ?>
-                                    <span class="badge bg-danger ms-1">-<?= $produto['percentual_desconto'] ?>% proximo venc.</span>
-                                    <small class="text-muted text-decoration-line-through ms-1">R$ <?= number_format($produto['preco_original'], 2, ',', '.') ?></small>
-                                    <?php endif; ?>
-                                </div>
-                                <div class="col-auto">
-                                    <span class="text-muted small">Estoque:</span>
-                                    <strong class="ms-1"><?= $produto['estoque_total'] ?> un.</strong>
-                                </div>
-                                <?php if (!empty($produto['descricao'])): ?>
-                                <div class="col-12">
-                                    <small class="text-muted"><?= htmlspecialchars($produto['descricao']) ?></small>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-
-                            <div class="d-flex gap-2 flex-wrap">
-                                <button type="button" class="btn btn-success btn-sm btn-adicionar-lote"
-                                    data-produto-id="<?= $produto['id'] ?>" 
-                                    data-produto-nome="<?= htmlspecialchars($produto['nome']) ?>">
-                                    <i class="bi bi-plus-circle"></i> Adicionar Lote
-                                </button>
-                                <button type="button" class="btn btn-warning btn-sm btn-editar-produto"
-                                    data-id="<?= $produto['id'] ?>" 
-                                    data-nome="<?= htmlspecialchars($produto['nome']) ?>"
-                                    data-fabricante="<?= htmlspecialchars($produto['fabricante']) ?>" 
-                                    data-categoria="<?= htmlspecialchars($produto['categoria']) ?>"
-                                    data-preco="<?= number_format($produto['preco_venda'], 2, '.', '') ?>"
-                                    data-descricao="<?= htmlspecialchars($produto['descricao'] ?? '') ?>">
-                                    <i class="bi bi-pencil"></i> Editar
-                                </button>
-                                <button type="button" class="btn btn-danger btn-sm btn-deletar-produto"
-                                    data-id="<?= $produto['id'] ?>">
-                                    <i class="bi bi-trash"></i> Excluir
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover" id="tabela-lotes-<?= $produto['id'] ?>">
-                            <thead class="table-primary">
-                                <tr>
-                                    <th>Nº Lote</th>
-                                    <th>Data de Validade</th>
-                                    <th>Dias Restantes</th>
-                                    <th>Quantidade</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted">
-                                        <span class="spinner-border spinner-border-sm"></span>
-                                        Carregando lotes...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
+    <!-- Filtros -->
+    <div class="card mb-3 border-0 shadow-sm">
+        <div class="card-body py-2">
+            <form method="GET" class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control" placeholder="Buscar por nome ou fabricante..." value="<?= htmlspecialchars($busca) ?>">
                     </div>
                 </div>
-            </div>
-        </div>
-        <?php endforeach; ?>
-    </div>
-    <?php else: ?>
-    <div class="alert alert-info">
-        <i class="bi bi-info-circle"></i>
-        Nenhum produto cadastrado. Clique em "Novo Produto" para começar.
-    </div>
-    <?php endif; ?>
-
-</div>
-
-<!-- ===== MODAL NOVO PRODUTO ===== -->
-<div class="modal fade" id="modalNovoProduto" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-plus-circle"></i> Cadastrar Novo Produto
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="formNovoProduto" enctype="multipart/form-data">
-                <div class="modal-body">
-                    <div class="row">
-                        <!-- Coluna esquerda -->
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label for="nome" class="form-label">Nome Comercial *</label>
-                                <input type="text" class="form-control" id="nome" name="nome" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="fabricante" class="form-label">Fabricante *</label>
-                                <input type="text" class="form-control" id="fabricante" name="fabricante" required>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="categoria" class="form-label">Categoria *</label>
-                                    <select class="form-select" id="categoria" name="categoria" required>
-                                        <option value="">Selecione...</option>
-                                        <option value="Comum">Comum</option>
-                                        <option value="Controlado">Controlado</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="preco_venda" class="form-label">Preço de Venda (R$) *</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">R$</span>
-                                        <input type="number" class="form-control" id="preco_venda" name="preco_venda" step="0.01" min="0.01" required>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="descricao" class="form-label">Descrição</label>
-                                <textarea class="form-control" id="descricao" name="descricao" rows="3"></textarea>
-                            </div>
-                        </div>
-                        <!-- Coluna direita - Foto -->
-                        <div class="col-md-4">
-                            <label class="form-label">Foto do Produto</label>
-                            <div id="foto-preview-box" class="d-flex align-items-center justify-content-center rounded border bg-light mb-2"
-                                 style="height:160px; cursor:pointer; position:relative; overflow:hidden;"
-                                 onclick="document.getElementById('foto').click()">
-                                <div id="foto-placeholder" class="text-center text-muted">
-                                    <i class="bi bi-camera-fill" style="font-size:2.5rem;"></i>
-                                    <p class="small mt-1 mb-0">Clique para adicionar foto</p>
-                                    <p class="small text-muted">JPG, PNG (máx. 2MB)</p>
-                                </div>
-                                <img id="foto-preview-img" src="" alt="Preview" 
-                                     style="display:none; width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;">
-                            </div>
-                            <input type="file" class="d-none" id="foto" name="foto" accept="image/jpeg,image/png,image/webp"
-                                   onchange="previewFoto(this, 'foto-preview-img', 'foto-placeholder')">
-                            <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="document.getElementById('foto').click()">
-                                <i class="bi bi-upload"></i> Selecionar Imagem
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Seção: Lote Inicial (opcional) -->
-                    <hr>
-                    <div class="d-flex align-items-center gap-2 mb-3">
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" id="incluir_lote_inicial" onchange="toggleLoteInicial(this.checked)">
-                            <label class="form-check-label fw-bold" for="incluir_lote_inicial">
-                                <i class="bi bi-box-seam"></i> Já adicionar estoque inicial
-                            </label>
-                        </div>
-                    </div>
-                    <div id="secao-lote-inicial" class="d-none">
-                        <div class="p-3 rounded" style="background:#f0f7ff; border:1px solid #b3d4f5;">
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Nº do Lote *</label>
-                                    <input type="text" class="form-control" id="lote_numero" name="lote_numero">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Data de Validade *</label>
-                                    <input type="date" class="form-control" id="lote_validade" name="lote_validade">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label class="form-label">Quantidade em Estoque *</label>
-                                    <div class="input-group">
-                                        <input type="number" class="form-control" id="lote_quantidade" name="lote_quantidade" min="1">
-                                        <span class="input-group-text">un.</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="col-md-4">
+                    <select name="cat" class="form-select form-select-sm">
+                        <option value="">Todas as categorias</option>
+                        <?php foreach($categorias as $c): ?>
+                        <option value="<?= htmlspecialchars($c['nome']) ?>" <?= $catFiltro===$c['nome']?'selected':'' ?>>
+                            <?= htmlspecialchars($c['nome']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-save"></i> Salvar Produto
-                    </button>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
+                    <a href="produtos.php" class="btn btn-outline-secondary btn-sm ms-1">Limpar</a>
                 </div>
             </form>
         </div>
     </div>
+
+    <!-- Tabela -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-table"></i> <?= $total ?> produto(s) encontrado(s)</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover prod-table mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Foto</th>
+                        <th>Produto</th>
+                        <th>Fabricante</th>
+                        <th>Categoria</th>
+                        <th>Preço</th>
+                        <th>Estoque</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php if (empty($produtos)): ?>
+                <tr><td colspan="8" class="text-center text-muted py-4"><i class="bi bi-inbox"></i> Nenhum produto encontrado.</td></tr>
+                <?php else: foreach($produtos as $p): ?>
+                <tr>
+                    <td><small class="text-muted">#<?= $p['id'] ?></small></td>
+                    <td>
+                        <?php if(!empty($p['foto'])): ?>
+                        <img class="foto-thumb" src="uploads/produtos/<?= htmlspecialchars($p['foto']) ?>" alt="">
+                        <?php else: ?>
+                        <div class="foto-ph"><i class="bi bi-capsule"></i></div>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <strong><?= htmlspecialchars($p['nome']) ?></strong>
+                        <?php if($p['receita_obrigatoria']): ?>
+                        <span class="badge badge-ctrl ms-1" style="font-size:.65rem;">Controlado</span>
+                        <?php endif; ?>
+                    </td>
+                    <td><?= htmlspecialchars($p['fabricante']) ?></td>
+                    <td><span class="badge bg-secondary"><?= htmlspecialchars($p['categoria']) ?></span></td>
+                    <td><strong class="text-success">R$ <?= number_format($p['preco_venda'],2,',','.') ?></strong></td>
+                    <td>
+                        <?php $est = (int)$p['estoque_total']; ?>
+                        <span class="badge <?= $est===0?'badge-sem':($est<5?'badge-ctrl':'badge-ok') ?>">
+                            <?= $est ?> un.
+                        </span>
+                        <small class="text-muted ms-1">(<?= $p['num_lotes'] ?> lote(s))</small>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick='editarProduto(<?= json_encode($p) ?>)' title="Editar">
+                            <i class="bi bi-pencil-fill"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-success ms-1" onclick="abrirModalLote(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['nome'])) ?>')" title="Adicionar Lote">
+                            <i class="bi bi-plus-circle"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger ms-1" onclick="deletarProduto(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['nome'])) ?>')" title="Remover">
+                            <i class="bi bi-trash3-fill"></i>
+                        </button>
+                    </td>
+                </tr>
+                <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php if($totalPags > 1): ?>
+        <div class="card-footer d-flex justify-content-center gap-1 flex-wrap">
+            <?php if($pagina>1): ?>
+            <a href="?q=<?=urlencode($busca)?>&cat=<?=urlencode($catFiltro)?>&p=<?=$pagina-1?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+            <?php endif; ?>
+            <?php for($i=1;$i<=$totalPags;$i++): if($i===1||$i===$totalPags||abs($i-$pagina)<=1): ?>
+            <a href="?q=<?=urlencode($busca)?>&cat=<?=urlencode($catFiltro)?>&p=<?=$i?>" class="btn btn-sm <?=$i===$pagina?'btn-primary':'btn-outline-secondary'?>"><?=$i?></a>
+            <?php elseif(abs($i-$pagina)===2): ?><span class="btn btn-sm disabled">…</span><?php endif; endfor; ?>
+            <?php if($pagina<$totalPags): ?>
+            <a href="?q=<?=urlencode($busca)?>&cat=<?=urlencode($catFiltro)?>&p=<?=$pagina+1?>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
 </div>
 
-<!-- ===== MODAL ADICIONAR LOTE ===== -->
-<div class="modal fade" id="modalNovoLote" tabindex="-1">
+<!-- ══ MODAL PRODUTO (criar/editar) ══ -->
+<div class="modal fade" id="modalProduto" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="modalProdutoTitulo"><i class="bi bi-box-seam"></i> Produto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="fb-produto"></div>
+                <input type="hidden" id="prod-id">
+
+                <div class="row g-3">
+                    <div class="col-md-7">
+                        <label class="form-label fw-bold">Nome do Produto *</label>
+                        <input type="text" class="form-control" id="prod-nome" placeholder="Ex: Dipirona 500mg">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">Fabricante *</label>
+                        <input type="text" class="form-control" id="prod-fabricante" placeholder="Ex: EMS, Medley...">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">
+                            Categoria *
+                            <button type="button" class="btn-add-cat-inline" onclick="abrirModalCategorias()" title="Gerenciar categorias">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                            <button type="button" class="btn-rm-cat-inline" onclick="abrirModalCatRemover()" title="Remover categoria">
+                                <i class="bi bi-dash-lg"></i>
+                            </button>
+                        </label>
+                        <select class="form-select" id="prod-categoria">
+                            <option value="">Selecione...</option>
+                            <?php foreach($categorias as $c): ?>
+                            <option value="<?= htmlspecialchars($c['nome']) ?>"><?= htmlspecialchars($c['nome']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Preço de Venda (R$) *</label>
+                        <input type="number" class="form-control" id="prod-preco" step="0.01" min="0.01" placeholder="0,00">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Controlado?</label>
+                        <select class="form-select" id="prod-ctrl">
+                            <option value="0">Não</option>
+                            <option value="1">Sim (Receita)</option>
+                        </select>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Descrição</label>
+                        <textarea class="form-control" id="prod-desc" rows="2" placeholder="Descrição opcional do produto..."></textarea>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Foto do Produto</label>
+                        <input type="file" class="form-control" id="prod-foto" accept="image/jpeg,image/png,image/webp">
+                        <small class="text-muted">JPG, PNG ou WEBP – máx. 2MB</small>
+                        <div id="foto-preview" class="mt-2"></div>
+                    </div>
+                </div>
+
+                <!-- Lote inicial (só na criação) -->
+                <div id="bloco-lote-inicial" class="mt-3 p-3 rounded" style="background:#f0faf4;border:1px dashed #2e7d32;">
+                    <h6 class="fw-bold text-success mb-2"><i class="bi bi-layers"></i> Lote Inicial (opcional)</h6>
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Número do Lote</label>
+                            <input type="text" class="form-control form-control-sm" id="lote-num" placeholder="Ex: L2024001">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Data de Validade</label>
+                            <input type="date" class="form-control form-control-sm" id="lote-val">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" class="form-control form-control-sm" id="lote-qtd" min="1" placeholder="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-success" onclick="salvarProduto()">
+                    <i class="bi bi-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MODAL LOTE ══ -->
+<div class="modal fade" id="modalLote" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-layers"></i> Adicionar Lote</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="fb-lote"></div>
+                <input type="hidden" id="lote-produto-id">
+                <p class="text-muted">Produto: <strong id="lote-produto-nome"></strong></p>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Número do Lote *</label>
+                    <input type="text" class="form-control" id="novo-lote-num" placeholder="Ex: L2024001">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Data de Validade *</label>
+                    <input type="date" class="form-control" id="novo-lote-val">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Quantidade *</label>
+                    <input type="number" class="form-control" id="novo-lote-qtd" min="1" placeholder="Quantidade inicial">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="salvarLote()">
+                    <i class="bi bi-save"></i> Salvar Lote
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ MODAL GERENCIAR CATEGORIAS (ADICIONAR) ══ -->
+<div class="modal fade" id="modalCategorias" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header bg-success text-white">
-                <h5 class="modal-title">
-                    <i class="bi bi-box"></i> Adicionar Lote ao Estoque
-                </h5>
+                <h5 class="modal-title"><i class="bi bi-tags-fill"></i> Adicionar Nova Categoria</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <form id="formNovoLote">
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label" for="produto_nome_display">Produto</label>
-                        <input type="text" class="form-control" id="produto_nome_display" readonly>
-                        <input type="hidden" id="produto_id_lote" name="produto_id">
-                    </div>
-                    <div class="mb-3">
-                        <label for="numero_lote" class="form-label">Número do Lote *</label>
-                        <input type="text" class="form-control" id="numero_lote" name="numero_lote" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="data_validade" class="form-label">Data de Validade *</label>
-                        <input type="date" class="form-control" id="data_validade" name="data_validade" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="qtd_atual" class="form-label">Quantidade *</label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="qtd_atual" name="qtd_atual" min="1" required>
-                            <span class="input-group-text">un.</span>
-                        </div>
-                    </div>
+            <div class="modal-body">
+                <div id="fb-nova-cat"></div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nome da Categoria *</label>
+                    <input type="text" class="form-control" id="nova-cat-nome" placeholder="Ex: Fitoterápicos">
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="bi bi-save"></i> Adicionar Lote
-                    </button>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Ícone <small class="text-muted">(Bootstrap Icons)</small></label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i id="preview-icone" class="bi bi-tag"></i></span>
+                        <input type="text" class="form-control" id="nova-cat-icone" value="bi-tag" placeholder="bi-capsule" oninput="atualizarIcone()">
+                    </div>
+                    <small class="text-muted">Veja ícones em <a href="https://icons.getbootstrap.com" target="_blank">icons.getbootstrap.com</a></small>
                 </div>
-            </form>
+                <hr>
+                <h6 class="fw-bold"><i class="bi bi-list-ul"></i> Categorias Atuais</h6>
+                <div id="lista-cats-preview" class="mt-2" style="max-height:200px;overflow-y:auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                <button type="button" class="btn btn-success" onclick="adicionarCategoria()">
+                    <i class="bi bi-plus-circle"></i> Adicionar
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- ===== MODAL EDITAR PRODUTO ===== -->
-<div class="modal fade" id="modalEditarProduto" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+<!-- ══ MODAL REMOVER CATEGORIA ══ -->
+<div class="modal fade" id="modalCatRemover" tabindex="-1">
+    <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header bg-warning text-dark">
-                <h5 class="modal-title">
-                    <i class="bi bi-pencil-square"></i> Editar Produto
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <form id="formEditarProduto" enctype="multipart/form-data">
-                <div class="modal-body">
-                    <input type="hidden" id="edit_produto_id" name="id">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label for="edit_nome" class="form-label">Nome Comercial *</label>
-                                <input type="text" class="form-control" id="edit_nome" name="nome" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="edit_fabricante" class="form-label">Fabricante *</label>
-                                <input type="text" class="form-control" id="edit_fabricante" name="fabricante" required>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="edit_categoria" class="form-label">Categoria *</label>
-                                    <select class="form-select" id="edit_categoria" name="categoria" required>
-                                        <option value="Comum">Comum</option>
-                                        <option value="Controlado">Controlado</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="edit_preco_venda" class="form-label">Preço de Venda (R$) *</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">R$</span>
-                                        <input type="number" class="form-control" id="edit_preco_venda" name="preco_venda" step="0.01" min="0.01" required>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="edit_descricao" class="form-label">Descrição</label>
-                                <textarea class="form-control" id="edit_descricao" name="descricao" rows="3"></textarea>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Foto do Produto</label>
-                            <div id="edit-foto-preview-box" class="d-flex align-items-center justify-content-center rounded border bg-light mb-2"
-                                 style="height:160px; cursor:pointer; position:relative; overflow:hidden;"
-                                 onclick="document.getElementById('edit_foto').click()">
-                                <div id="edit-foto-placeholder" class="text-center text-muted">
-                                    <i class="bi bi-camera-fill" style="font-size:2.5rem;"></i>
-                                    <p class="small mt-1 mb-0">Clique para trocar a foto</p>
-                                </div>
-                                <img id="edit-foto-preview-img" src="" alt="Preview"
-                                     style="display:none; width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;">
-                            </div>
-                            <input type="file" class="d-none" id="edit_foto" name="foto" accept="image/jpeg,image/png,image/webp"
-                                   onchange="previewFoto(this, 'edit-foto-preview-img', 'edit-foto-placeholder')">
-                            <button type="button" class="btn btn-sm btn-outline-secondary w-100" onclick="document.getElementById('edit_foto').click()">
-                                <i class="bi bi-upload"></i> Trocar Imagem
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-warning">
-                        <i class="bi bi-save"></i> Salvar Alterações
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<script>
-    // Preview de foto antes do upload
-    function previewFoto(input, imgId, placeholderId) {
-        const file = input.files[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            alert('Imagem muito grande. O tamanho máximo é 2MB.');
-            input.value = '';
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = document.getElementById(imgId);
-            const ph = document.getElementById(placeholderId);
-            img.src = e.target.result;
-            img.style.display = 'block';
-            ph.style.display = 'none';
-        };
-        reader.readAsDataURL(file);
-    }
-
-    function toggleLoteInicial(checked) {
-        const sec = document.getElementById('secao-lote-inicial');
-        sec.classList.toggle('d-none', !checked);
-        ['lote_numero','lote_validade','lote_quantidade'].forEach(id => {
-            document.getElementById(id).required = checked;
-        });
-    }
-
-    // ── Salvar novo produto ──────────────────────────────────────────────
-    let _salvandoProduto = false;
-    document.getElementById('formNovoProduto').addEventListener('submit', async function(event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        if (_salvandoProduto) return;
-        _salvandoProduto = true;
-        const btn = this.querySelector('[type=submit]');
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
-        try {
-            const formData = new FormData(this);
-            // Fecha modal ANTES do fetch para evitar resubmissao pelo browser
-            const modal = bootstrap.Modal.getInstance(document.getElementById('modalNovoProduto'));
-            if (modal) modal.hide();
-            this.reset();
-            document.getElementById('foto-preview-img').style.display = 'none';
-            document.getElementById('foto-placeholder').style.display = '';
-            document.getElementById('secao-lote-inicial').classList.add('d-none');
-            const res    = await fetch('api.php?endpoint=produtos_criar', { method: 'POST', body: formData });
-            const result = await res.json();
-            if (result.success) {
-                window.location.href = window.location.pathname;
-            } else {
-                alert('Erro: ' + result.message);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-save"></i> Salvar Produto';
-                _salvandoProduto = false;
-            }
-        } catch (e) {
-            alert('Erro ao salvar produto');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-save"></i> Salvar Produto';
-            _salvandoProduto = false;
-        }
-    });
-
-    // ── Salvar lote ─────────────────────────────────────────────────────
-    document.getElementById('formNovoLote').addEventListener('submit', async function(event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        const btn = this.querySelector('[type=submit]');
-        if (btn.disabled) return;
-        btn.disabled = true;
-        try {
-            const res    = await fetch('api.php?endpoint=lotes_criar', { method: 'POST', body: new FormData(this) });
-            const result = await res.json();
-            if (result.success) location.reload();
-            else { alert('Erro: ' + result.message); btn.disabled = false; }
-        } catch (e) { alert('Erro ao salvar lote'); btn.disabled = false; }
-    });
-
-    // ── Salvar edição ────────────────────────────────────────────────────
-    document.getElementById('formEditarProduto').addEventListener('submit', async function(event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        const btn = this.querySelector('[type=submit]');
-        if (btn.disabled) return;
-        btn.disabled = true;
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
-        try {
-            const res    = await fetch('api.php?endpoint=produtos_editar_form', { method: 'POST', body: new FormData(this) });
-            const result = await res.json();
-            if (result.success) location.reload();
-            else {
-                alert('Erro: ' + result.message);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-save"></i> Salvar Alterações';
-            }
-        } catch (e) {
-            alert('Erro ao atualizar produto');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-save"></i> Salvar Alterações';
-        }
-    });
-
-    // ── Deletar produto ──────────────────────────────────────────────────
-    async function deletarProduto(id) {
-        if (!confirm('Excluir este produto e todos os seus lotes?')) return;
-        try {
-            const res    = await fetch('api.php?endpoint=produtos_deletar', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id })
-            });
-            const result = await res.json();
-            if (result.success) {
-                if (result.aviso) alert('Aviso: ' + result.aviso);
-                location.reload();
-            } else {
-                alert('Erro: ' + result.message);
-            }
-        } catch (e) { alert('Erro ao excluir produto'); }
-    }
-
-    // ── Delegação de eventos (um único listener no container) ────────────
-    document.getElementById('accordionProdutos').addEventListener('click', function(e) {
-        // Botão Editar
-        const btnEditar = e.target.closest('.btn-editar-produto');
-        if (btnEditar) {
-            e.stopPropagation();
-            document.getElementById('edit_produto_id').value  = btnEditar.dataset.id;
-            document.getElementById('edit_nome').value        = btnEditar.dataset.nome;
-            document.getElementById('edit_fabricante').value  = btnEditar.dataset.fabricante;
-            document.getElementById('edit_categoria').value   = btnEditar.dataset.categoria;
-            document.getElementById('edit_preco_venda').value = btnEditar.dataset.preco;
-            document.getElementById('edit_descricao').value   = btnEditar.dataset.descricao;
-            document.getElementById('edit-foto-preview-img').style.display = 'none';
-            document.getElementById('edit-foto-placeholder').style.display = '';
-            new bootstrap.Modal(document.getElementById('modalEditarProduto')).show();
-            return;
-        }
-
-        // Botão Adicionar Lote
-        const btnLote = e.target.closest('.btn-adicionar-lote');
-        if (btnLote) {
-            e.stopPropagation();
-            document.getElementById('produto_id_lote').value      = btnLote.dataset.produtoId;
-            document.getElementById('produto_nome_display').value = btnLote.dataset.produtoNome;
-            new bootstrap.Modal(document.getElementById('modalNovoLote')).show();
-            return;
-        }
-
-        // Botão Deletar
-        const btnDel = e.target.closest('.btn-deletar-produto');
-        if (btnDel) {
-            e.stopPropagation();
-            deletarProduto(btnDel.dataset.id);
-            return;
-        }
-    });
-
-    // ── Accordion: um painel por vez + carrega lotes lazy ───────────
-    let abrindo = false; // flag para evitar loop de eventos
-
-    document.querySelectorAll('.accordion-button').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.stopPropagation();
-            if (abrindo) return;
-            abrindo = true;
-
-            const targetId  = this.dataset.bsTarget; // ex: "#collapse-5"
-            const targetEl  = document.querySelector(targetId);
-            const jaAberto  = targetEl.classList.contains('show');
-
-            // Fecha todos os painéis abertos
-            document.querySelectorAll('.accordion-collapse.show').forEach(openEl => {
-                bootstrap.Collapse.getOrCreateInstance(openEl, {toggle: false}).hide();
-                const hdr = document.querySelector(`[data-bs-target="#${openEl.id}"]`);
-                if (hdr) hdr.classList.add('collapsed');
-            });
-
-            // Abre o clicado (se estava fechado)
-            if (!jaAberto) {
-                bootstrap.Collapse.getOrCreateInstance(targetEl, {toggle: false}).show();
-                carregarLotes(targetEl.id.replace('collapse-', ''));
-            }
-
-            setTimeout(() => { abrindo = false; }, 400);
-        });
-    });
-
-    async function carregarLotes(produtoId) {
-        const tabela = document.querySelector(`#tabela-lotes-${produtoId} tbody`);
-        if (!tabela || tabela.dataset.loaded) return;
-        tabela.dataset.loaded = '1';
-        try {
-            const res  = await fetch(`api.php?endpoint=lotes_listar&produto_id=${produtoId}`);
-            const data = await res.json();
-            if (data.success && data.lotes.length > 0) {
-                tabela.innerHTML = data.lotes.map(l => {
-                    const badge = l.vencendo
-                        ? `<span class="badge bg-danger">${l.dias_para_vencer} dia(s)</span>`
-                        : `<span class="badge bg-success">OK</span>`;
-                    return `<tr>
-                        <td>${l.numero_lote}</td>
-                        <td>${new Date(l.data_validade + 'T00:00:00').toLocaleDateString('pt-BR')}</td>
-                        <td>${l.dias_para_vencer} dia(s)</td>
-                        <td>${l.qtd_atual} un.</td>
-                        <td>${badge}</td>
-                    </tr>`;
-                }).join('');
-            } else {
-                tabela.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Nenhum lote em estoque.</td></tr>';
-            }
-        } catch(err) {
-            tabela.innerHTML = '<tr><td colspan="5" class="text-danger text-center">Erro ao carregar lotes.</td></tr>';
-        }
-    }
-</script>
-
-<!-- ===== MODAL LIGHTBOX ===== -->
-<div class="modal fade" id="modalLightbox" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:min(90vw, 700px);">
-        <div class="modal-content border-0" style="background:transparent;">
-            <div class="modal-header border-0 pb-1" style="background:rgba(0,0,0,.55); border-radius:10px 10px 0 0;">
-                <h6 class="modal-title text-white fw-bold" id="lightbox-titulo"></h6>
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-trash3-fill"></i> Remover Categoria</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body p-0 text-center" style="background:#111; border-radius:0 0 10px 10px;">
-                <img id="lightbox-img" src="" alt=""
-                     style="max-width:100%; max-height:75vh; object-fit:contain; border-radius:0 0 10px 10px;">
+            <div class="modal-body">
+                <div id="fb-rm-cat"></div>
+                <p class="text-muted">Selecione a categoria que deseja remover. Produtos vinculados a ela <strong>não serão afetados</strong>, apenas a categoria do menu.</p>
+                <div id="lista-cats-remover"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    function abrirLightbox(src, nome) {
-        document.getElementById('lightbox-img').src   = src;
-        document.getElementById('lightbox-titulo').textContent = nome;
-        new bootstrap.Modal(document.getElementById('modalLightbox')).show();
+// ════════════════════════════════════
+// CATEGORIAS (carregadas do servidor)
+// ════════════════════════════════════
+let categorias = <?= json_encode(array_values($categorias)) ?>;
+
+function recarregarSelectCats(valorAtual) {
+    const sel = document.getElementById('prod-categoria');
+    const val = valorAtual ?? sel.value;
+    sel.innerHTML = '<option value="">Selecione...</option>' +
+        categorias.map(c => `<option value="${esc(c.nome)}" ${c.nome===val?'selected':''}>${esc(c.nome)}</option>`).join('');
+}
+
+function atualizarIcone() {
+    const v = document.getElementById('nova-cat-icone').value.trim();
+    document.getElementById('preview-icone').className = 'bi ' + v;
+}
+
+function listarCatsPreview() {
+    const el = document.getElementById('lista-cats-preview');
+    if (!el) return;
+    el.innerHTML = categorias.length ? categorias.map(c => `
+        <div class="d-flex align-items-center gap-2 p-1 mb-1 rounded border" style="background:#f8f9fa;">
+            <i class="bi ${esc(c.icone||'bi-tag')} text-success"></i>
+            <span class="flex-grow-1 fw-bold">${esc(c.nome)}</span>
+        </div>`).join('') : '<p class="text-muted">Nenhuma categoria.</p>';
+}
+
+function listarCatsRemover() {
+    const el = document.getElementById('lista-cats-remover');
+    if (!el) return;
+    el.innerHTML = categorias.length ? categorias.map(c => `
+        <div class="d-flex align-items-center gap-2 p-2 mb-1 rounded border" style="background:#fff5f5;">
+            <i class="bi ${esc(c.icone||'bi-tag')} text-danger"></i>
+            <span class="flex-grow-1 fw-bold">${esc(c.nome)}</span>
+            <button class="btn btn-sm btn-outline-danger" onclick="removerCategoria(${c.id}, '${esc(c.nome)}')">
+                <i class="bi bi-trash3"></i> Remover
+            </button>
+        </div>`).join('') : '<p class="text-muted">Nenhuma categoria cadastrada.</p>';
+}
+
+function abrirModalCategorias() {
+    document.getElementById('nova-cat-nome').value = '';
+    document.getElementById('nova-cat-icone').value = 'bi-tag';
+    document.getElementById('fb-nova-cat').innerHTML = '';
+    atualizarIcone();
+    listarCatsPreview();
+    new bootstrap.Modal(document.getElementById('modalCategorias')).show();
+}
+
+function abrirModalCatRemover() {
+    document.getElementById('fb-rm-cat').innerHTML = '';
+    listarCatsRemover();
+    new bootstrap.Modal(document.getElementById('modalCatRemover')).show();
+}
+
+async function adicionarCategoria() {
+    const nome  = document.getElementById('nova-cat-nome').value.trim();
+    const icone = document.getElementById('nova-cat-icone').value.trim() || 'bi-tag';
+    const fb    = document.getElementById('fb-nova-cat');
+    if (!nome) { fb.innerHTML = '<div class="alert alert-danger py-2">Informe o nome da categoria.</div>'; return; }
+
+    const fd = new FormData();
+    fd.append('nome', nome);
+    fd.append('icone', icone);
+    const r = await fetch('api.php?endpoint=categoria_criar', { method:'POST', body:fd });
+    const d = await r.json();
+
+    if (d.success) {
+        categorias.push({ id: d.id, nome, icone, ativo:1, ordem:0 });
+        fb.innerHTML = '<div class="alert alert-success py-2"><i class="bi bi-check-circle-fill"></i> Categoria adicionada!</div>';
+        document.getElementById('nova-cat-nome').value = '';
+        recarregarSelectCats(nome);
+        listarCatsPreview();
+    } else {
+        fb.innerHTML = `<div class="alert alert-danger py-2">${d.message}</div>`;
     }
+}
+
+async function removerCategoria(id, nome) {
+    if (!confirm(`Remover a categoria "${nome}"?\nProdutos vinculados não serão deletados.`)) return;
+    const r = await fetch('api.php?endpoint=categoria_remover', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})
+    });
+    const d = await r.json();
+    if (d.success) {
+        categorias = categorias.filter(c => c.id !== id);
+        recarregarSelectCats(null);
+        listarCatsRemover();
+        listarCatsPreview();
+        document.getElementById('fb-rm-cat').innerHTML =
+            `<div class="alert alert-success py-2"><i class="bi bi-check-circle-fill"></i> Categoria "${nome}" removida.</div>`;
+    } else {
+        document.getElementById('fb-rm-cat').innerHTML = `<div class="alert alert-danger py-2">${d.message}</div>`;
+    }
+}
+
+// ════════════════════════════════════
+// PRODUTOS
+// ════════════════════════════════════
+function abrirModalProduto(prod) {
+    document.getElementById('fb-produto').innerHTML = '';
+    document.getElementById('prod-id').value       = '';
+    document.getElementById('prod-nome').value     = '';
+    document.getElementById('prod-fabricante').value = '';
+    document.getElementById('prod-preco').value    = '';
+    document.getElementById('prod-desc').value     = '';
+    document.getElementById('prod-ctrl').value     = '0';
+    document.getElementById('prod-foto').value     = '';
+    document.getElementById('foto-preview').innerHTML = '';
+    document.getElementById('lote-num').value      = '';
+    document.getElementById('lote-val').value      = '';
+    document.getElementById('lote-qtd').value      = '';
+    document.getElementById('bloco-lote-inicial').style.display = 'block';
+    document.getElementById('modalProdutoTitulo').innerHTML     = '<i class="bi bi-plus-circle"></i> Novo Produto';
+    recarregarSelectCats('');
+    new bootstrap.Modal(document.getElementById('modalProduto')).show();
+}
+
+function editarProduto(p) {
+    document.getElementById('fb-produto').innerHTML = '';
+    document.getElementById('prod-id').value        = p.id;
+    document.getElementById('prod-nome').value      = p.nome;
+    document.getElementById('prod-fabricante').value= p.fabricante;
+    document.getElementById('prod-preco').value     = p.preco_venda;
+    document.getElementById('prod-desc').value      = p.descricao || '';
+    document.getElementById('prod-ctrl').value      = p.receita_obrigatoria ? '1' : '0';
+    document.getElementById('prod-foto').value      = '';
+    document.getElementById('bloco-lote-inicial').style.display = 'none';
+    document.getElementById('modalProdutoTitulo').innerHTML      = '<i class="bi bi-pencil-fill"></i> Editar Produto';
+    if (p.foto) {
+        document.getElementById('foto-preview').innerHTML =
+            `<img src="uploads/produtos/${p.foto}" style="height:60px;border-radius:6px;"> <small class="text-muted ms-2">Foto atual</small>`;
+    } else {
+        document.getElementById('foto-preview').innerHTML = '';
+    }
+    recarregarSelectCats(p.categoria);
+    new bootstrap.Modal(document.getElementById('modalProduto')).show();
+}
+
+async function salvarProduto() {
+    const id     = document.getElementById('prod-id').value;
+    const fb     = document.getElementById('fb-produto');
+    const fd     = new FormData();
+
+    fd.append('nome',       document.getElementById('prod-nome').value.trim());
+    fd.append('fabricante', document.getElementById('prod-fabricante').value.trim());
+    fd.append('categoria',  document.getElementById('prod-categoria').value);
+    fd.append('preco_venda',document.getElementById('prod-preco').value);
+    fd.append('descricao',  document.getElementById('prod-desc').value.trim());
+
+    const fotoFile = document.getElementById('prod-foto').files[0];
+    if (fotoFile) fd.append('foto', fotoFile);
+
+    let endpoint;
+    if (id) {
+        fd.append('id', id);
+        endpoint = 'produtos_editar_form';
+    } else {
+        fd.append('lote_numero',    document.getElementById('lote-num').value.trim());
+        fd.append('lote_validade',  document.getElementById('lote-val').value);
+        fd.append('lote_quantidade',document.getElementById('lote-qtd').value);
+        endpoint = 'produtos_criar';
+    }
+
+    fb.innerHTML = '<div class="alert alert-info py-2"><span class="spinner-border spinner-border-sm me-2"></span>Salvando...</div>';
+    try {
+        const r = await fetch(`api.php?endpoint=${endpoint}`, { method:'POST', body:fd });
+        const d = await r.json();
+        if (d.success) {
+            fb.innerHTML = '<div class="alert alert-success py-2"><i class="bi bi-check-circle-fill"></i> Salvo com sucesso! Recarregando...</div>';
+            setTimeout(() => location.reload(), 900);
+        } else {
+            fb.innerHTML = `<div class="alert alert-danger py-2">${d.message}</div>`;
+        }
+    } catch(e) { fb.innerHTML = '<div class="alert alert-danger py-2">Erro de comunicação.</div>'; }
+}
+
+async function deletarProduto(id, nome) {
+    if (!confirm(`Remover o produto "${nome}"?`)) return;
+    const r = await fetch('api.php?endpoint=produtos_deletar', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})
+    });
+    const d = await r.json();
+    if (d.success) {
+        if (d.aviso) alert('⚠️ ' + d.aviso);
+        location.reload();
+    } else { alert('Erro: ' + d.message); }
+}
+
+// ════════════════════════════════════
+// LOTES
+// ════════════════════════════════════
+function abrirModalLote(prodId, prodNome) {
+    document.getElementById('lote-produto-id').value = prodId;
+    document.getElementById('lote-produto-nome').textContent = prodNome;
+    document.getElementById('novo-lote-num').value  = '';
+    document.getElementById('novo-lote-val').value  = '';
+    document.getElementById('novo-lote-qtd').value  = '';
+    document.getElementById('fb-lote').innerHTML    = '';
+    new bootstrap.Modal(document.getElementById('modalLote')).show();
+}
+
+async function salvarLote() {
+    const fb = document.getElementById('fb-lote');
+    const fd = new FormData();
+    fd.append('produto_id',   document.getElementById('lote-produto-id').value);
+    fd.append('numero_lote',  document.getElementById('novo-lote-num').value.trim());
+    fd.append('data_validade',document.getElementById('novo-lote-val').value);
+    fd.append('qtd_atual',    document.getElementById('novo-lote-qtd').value);
+
+    fb.innerHTML = '<div class="alert alert-info py-2"><span class="spinner-border spinner-border-sm me-2"></span>Salvando lote...</div>';
+    try {
+        const r = await fetch('api.php?endpoint=lotes_criar', { method:'POST', body:fd });
+        const d = await r.json();
+        if (d.success) {
+            fb.innerHTML = '<div class="alert alert-success py-2"><i class="bi bi-check-circle-fill"></i> Lote adicionado! Recarregando...</div>';
+            setTimeout(() => location.reload(), 900);
+        } else { fb.innerHTML = `<div class="alert alert-danger py-2">${d.message}</div>`; }
+    } catch(e) { fb.innerHTML = '<div class="alert alert-danger py-2">Erro de comunicação.</div>'; }
+}
+
+// ════════════════════════════════════
+// UTIL
+// ════════════════════════════════════
+function esc(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Preview foto selecionada
+document.getElementById('prod-foto')?.addEventListener('change', function() {
+    const f = this.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        document.getElementById('foto-preview').innerHTML =
+            `<img src="${e.target.result}" style="height:60px;border-radius:6px;"> <small class="text-muted ms-2">Nova foto selecionada</small>`;
+    };
+    reader.readAsDataURL(f);
+});
 </script>
 
 <?php include 'footer.php'; ?>

@@ -13,13 +13,37 @@ if (!isset($_SESSION['usuario_id'])) {
     json_response(['success' => false, 'message' => 'Sessão expirada. Faça login novamente.'], 401);
 }
 
-// Garante que coluna 'ativo' existe (criada lazy na primeira execução)
+// Garante que coluna 'ativo' existe
 $pdo = Config::getDbConnection();
 $colAtivo = $pdo->query("SHOW COLUMNS FROM produtos LIKE 'ativo'")->fetchAll();
 if (empty($colAtivo)) {
     $pdo->exec("ALTER TABLE produtos ADD COLUMN `ativo` TINYINT(1) NOT NULL DEFAULT 1");
     $pdo->exec("UPDATE produtos SET ativo = 1 WHERE ativo IS NULL");
 }
+
+// Remove soft-deleted sem histórico (sem venda interna E sem pedido de loja)
+// Mantém apenas os que têm referências históricas
+try {
+    $pdo->exec("
+        DELETE FROM produtos
+        WHERE COALESCE(ativo,1) = 0
+          AND id NOT IN (SELECT DISTINCT produto_id FROM itens_venda)
+          AND id NOT IN (SELECT DISTINCT produto_id FROM pedido_itens)
+    ");
+} catch (\Exception $e) { /* tabelas ainda podem não existir */ }
+
+// Garantir índice UNIQUE na criação de produtos (evita race condition)
+try {
+    $indexExists = $pdo->query("
+        SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_NAME='produtos' AND COLUMN_NAME='nome' AND SEQ_IN_INDEX=1
+        AND INDEX_NAME LIKE 'idx_%' AND NON_UNIQUE=0
+    ")->fetch();
+    if (!$indexExists) {
+        $pdo->exec("ALTER TABLE produtos ADD UNIQUE INDEX idx_nome_fabricante_ativo (nome, fabricante, ativo)");
+    }
+} catch (\Exception $e) { /* já existe ou não consegue */ }
+
 $endpoint = $_GET['endpoint'] ?? '';
 
 // ─── Helper: salvar imagem enviada via upload ───────────────────────────────
@@ -64,31 +88,56 @@ try {
                 json_response(['success' => false, 'message' => 'Preencha todos os campos obrigatórios.']);
             }
 
-            // Proteção contra dupla inserção
-            $chk = $pdo->prepare("SELECT id FROM produtos WHERE nome = ? AND fabricante = ? AND COALESCE(ativo,1) = 1 LIMIT 1");
-            $chk->execute([$nome, $fabric]);
-            $existente = $chk->fetchColumn();
-            if ($existente) {
-                json_response(['success' => true, 'produto_id' => $existente]);
-            }
-
             $foto = salvarImagem('foto', 'produtos');
 
-            $stmt = $pdo->prepare("INSERT INTO produtos (nome, fabricante, categoria, preco_venda, descricao, foto, ativo) VALUES (?, ?, ?, ?, ?, ?, 1)");
-            $stmt->execute([$nome, $fabric, $cat, $preco, $desc, $foto]);
-            $produtoId = $pdo->lastInsertId();
+            $pdo->beginTransaction();
+            try {
+                // Busca produto com mesmo nome+fabricante independente do status ativo
+                $chk = $pdo->prepare("SELECT id, ativo FROM produtos WHERE nome = ? AND fabricante = ? LIMIT 1 FOR UPDATE");
+                $chk->execute([$nome, $fabric]);
+                $existente = $chk->fetch();
 
-            // Lote inicial (opcional)
-            $loteNum = trim($_POST['lote_numero'] ?? '');
-            $loteVal = trim($_POST['lote_validade'] ?? '');
-            $loteQtd = intval($_POST['lote_quantidade'] ?? 0);
+                if ($existente) {
+                    if ((int)$existente['ativo'] === 1) {
+                        // Produto já ativo — não duplicar
+                        $pdo->rollBack();
+                        json_response(['success' => false, 'message' => 'Já existe um produto com este nome e fabricante.']);
+                    }
 
-            if ($loteNum && $loteVal && $loteQtd > 0) {
-                $stmtL = $pdo->prepare("INSERT INTO lotes (produto_id, numero_lote, data_validade, qtd_atual, qtd_inicial) VALUES (?, ?, ?, ?, ?)");
-                $stmtL->execute([$produtoId, $loteNum, $loteVal, $loteQtd, $loteQtd]);
+                    // Produto estava desativado (soft-delete) — reativar com novos dados
+                    $produtoId = (int)$existente['id'];
+                    $stmtReativa = $pdo->prepare(
+                        "UPDATE produtos SET categoria=?, preco_venda=?, descricao=?, ativo=1" .
+                        ($foto ? ", foto=?" : "") .
+                        " WHERE id=?"
+                    );
+                    $params = [$cat, $preco, $desc];
+                    if ($foto) $params[] = $foto;
+                    $params[] = $produtoId;
+                    $stmtReativa->execute($params);
+                } else {
+                    // Produto novo — inserir
+                    $stmt = $pdo->prepare("INSERT INTO produtos (nome, fabricante, categoria, preco_venda, descricao, foto, ativo) VALUES (?, ?, ?, ?, ?, ?, 1)");
+                    $stmt->execute([$nome, $fabric, $cat, $preco, $desc, $foto]);
+                    $produtoId = (int)$pdo->lastInsertId();
+                }
+
+                // Lote inicial (opcional)
+                $loteNum = trim($_POST['lote_numero'] ?? '');
+                $loteVal = trim($_POST['lote_validade'] ?? '');
+                $loteQtd = intval($_POST['lote_quantidade'] ?? 0);
+
+                if ($loteNum && $loteVal && $loteQtd > 0) {
+                    $stmtL = $pdo->prepare("INSERT INTO lotes (produto_id, numero_lote, data_validade, qtd_atual, qtd_inicial) VALUES (?, ?, ?, ?, ?)");
+                    $stmtL->execute([$produtoId, $loteNum, $loteVal, $loteQtd, $loteQtd]);
+                }
+
+                $pdo->commit();
+                json_response(['success' => true, 'produto_id' => $produtoId]);
+            } catch (\PDOException $e) {
+                $pdo->rollBack();
+                throw $e;
             }
-
-            json_response(['success' => true, 'produto_id' => $produtoId]);
             break;
 
         // ── EDITAR PRODUTO via FormData (suporta upload de foto) ───────────
@@ -141,15 +190,23 @@ try {
             $id   = intval($data['id'] ?? 0);
             if (!$id) json_response(['success' => false, 'message' => 'ID inválido.']);
 
-            // Verifica se o produto tem vendas vinculadas
+            // Verifica se o produto tem vendas internas vinculadas
             $chkVenda = $pdo->prepare("SELECT COUNT(*) FROM itens_venda WHERE produto_id = ?");
             $chkVenda->execute([$id]);
             $temVendas = (int)$chkVenda->fetchColumn() > 0;
 
-            if ($temVendas) {
-                // Produto tem histórico de vendas — apenas desativa (soft delete)
+            // Verifica se o produto tem pedidos da loja vinculados
+            $chkPedido = $pdo->prepare("SELECT COUNT(*) FROM pedido_itens WHERE produto_id = ?");
+            $chkPedido->execute([$id]);
+            $temPedidos = (int)$chkPedido->fetchColumn() > 0;
+
+            if ($temVendas || $temPedidos) {
+                // Produto tem histórico — apenas desativa (soft delete)
                 $pdo->prepare("UPDATE produtos SET ativo = 0 WHERE id = ?")->execute([$id]);
-                json_response(['success' => true, 'aviso' => 'Produto desativado pois possui vendas vinculadas. Ele não aparecerá mais na lista.']);
+                $origens = [];
+                if ($temVendas)  $origens[] = 'vendas internas';
+                if ($temPedidos) $origens[] = 'pedidos da loja';
+                json_response(['success' => true, 'aviso' => 'Produto desativado pois possui ' . implode(' e ', $origens) . ' vinculadas. Ele não aparecerá mais na lista.']);
             } else {
                 // Sem vendas — pode deletar fisicamente
                 // Remove lotes primeiro (FK)
@@ -336,6 +393,61 @@ try {
             $itens = $s->fetchAll();
             $total = array_sum(array_map(fn($i) => $i['quantidade']*$i['preco'], $itens));
             json_response(['success'=>true,'itens'=>$itens,'total'=>$total]);
+            break;
+
+        // ── CRIAR CATEGORIA ────────────────────────────────────────────────
+        case 'categoria_criar':
+            $nome  = trim($_POST['nome'] ?? '');
+            $icone = trim($_POST['icone'] ?? 'bi-tag');
+            if (!$nome) json_response(['success'=>false,'message'=>'Nome da categoria obrigatório.']);
+            // Garante que a tabela existe
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `categorias` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `nome` varchar(100) NOT NULL,
+                  `icone` varchar(50) DEFAULT 'bi-tag',
+                  `ativo` tinyint(1) DEFAULT 1,
+                  `ordem` int(11) DEFAULT 0,
+                  `criado_em` datetime DEFAULT current_timestamp(),
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `nome` (`nome`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            ");
+            try {
+                $s = $pdo->prepare("INSERT INTO categorias (nome, icone) VALUES (?, ?)");
+                $s->execute([$nome, $icone]);
+                json_response(['success'=>true,'id'=>(int)$pdo->lastInsertId()]);
+            } catch (\PDOException $e) {
+                json_response(['success'=>false,'message'=>'Categoria já existe com este nome.']);
+            }
+            break;
+
+        // ── REMOVER CATEGORIA ──────────────────────────────────────────────
+        case 'categoria_remover':
+            $data = json_decode(file_get_contents('php://input'), true);
+            $id   = intval($data['id'] ?? 0);
+            if (!$id) json_response(['success'=>false,'message'=>'ID inválido.']);
+            $pdo->prepare("DELETE FROM categorias WHERE id=?")->execute([$id]);
+            json_response(['success'=>true]);
+            break;
+
+        // ── LISTAR CATEGORIAS ──────────────────────────────────────────────
+        case 'categorias_listar':
+            // Garante tabela existe
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS `categorias` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `nome` varchar(100) NOT NULL,
+                  `icone` varchar(50) DEFAULT 'bi-tag',
+                  `ativo` tinyint(1) DEFAULT 1,
+                  `ordem` int(11) DEFAULT 0,
+                  `criado_em` datetime DEFAULT current_timestamp(),
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `nome` (`nome`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+            ");
+            $cats = $pdo->query("SELECT * FROM categorias WHERE ativo=1 ORDER BY ordem ASC, nome ASC")->fetchAll();
+            json_response(['success'=>true,'categorias'=>$cats]);
             break;
 
         default:
