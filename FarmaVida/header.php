@@ -54,6 +54,11 @@ if (session_status() === PHP_SESSION_NONE) {
                         </a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'pedidos_loja.php' ? 'active' : '' ?>" href="pedidos_loja.php">
+                            <i class="bi bi-bag-check-fill"></i> Pedidos Online
+                        </a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link <?= basename($_SERVER['PHP_SELF']) === 'relatorios.php' ? 'active' : '' ?>" href="relatorios.php">
                             <i class="bi bi-file-earmark-bar-graph"></i> Relatórios
                         </a>

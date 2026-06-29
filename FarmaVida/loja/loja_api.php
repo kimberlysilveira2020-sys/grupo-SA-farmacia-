@@ -300,6 +300,340 @@ try {
             jsonResp(['success'=>true]);
             break;
 
+        // ══════════════════════════════════════════════════════════════
+        // CARTÃO DE CRÉDITO
+        // ══════════════════════════════════════════════════════════════
+
+        // ── Listar cartões salvos do cliente ────────────────────────
+        case 'cartoes_listar':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Não autenticado.'],401);
+            $s = $pdo->prepare("SELECT id,apelido,bandeira,ultimos4,nome_titular,mes_validade,ano_validade,padrao FROM cartoes_cliente WHERE cliente_id=? ORDER BY padrao DESC, criado_em DESC");
+            $s->execute([clienteId()]);
+            jsonResp(['success'=>true,'cartoes'=>$s->fetchAll()]);
+            break;
+
+        // ── Salvar novo cartão ───────────────────────────────────────
+        case 'cartao_salvar':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Não autenticado.'],401);
+            $numero    = preg_replace('/\D/','',$_POST['numero'] ?? '');
+            $nome      = strtoupper(trim($_POST['nome_titular'] ?? ''));
+            $mes       = str_pad(preg_replace('/\D/','',$_POST['mes'] ?? ''),2,'0',STR_PAD_LEFT);
+            $ano       = preg_replace('/\D/','',$_POST['ano'] ?? '');
+            $cvv       = preg_replace('/\D/','',$_POST['cvv'] ?? '');
+            $apelido   = trim($_POST['apelido'] ?? '') ?: '';
+            $padrao    = (int)($_POST['padrao'] ?? 0);
+
+            // Validações básicas
+            if (strlen($numero) < 13 || strlen($numero) > 19)
+                jsonResp(['success'=>false,'message'=>'Número de cartão inválido.']);
+            if (!$nome) jsonResp(['success'=>false,'message'=>'Nome do titular obrigatório.']);
+            if (!preg_match('/^(0[1-9]|1[0-2])$/', $mes))
+                jsonResp(['success'=>false,'message'=>'Mês de validade inválido.']);
+            if (!preg_match('/^\d{4}$/', $ano) || $ano < date('Y'))
+                jsonResp(['success'=>false,'message'=>'Ano de validade inválido.']);
+            if (strlen($cvv) < 3) jsonResp(['success'=>false,'message'=>'CVV inválido.']);
+
+            // Detectar bandeira
+            $bandeira = 'outro';
+            if (preg_match('/^4/', $numero))                          $bandeira = 'visa';
+            elseif (preg_match('/^5[1-5]|^2[2-7]/', $numero))        $bandeira = 'mastercard';
+            elseif (preg_match('/^3[47]/', $numero))                  $bandeira = 'amex';
+            elseif (preg_match('/^6(?:011|5)/', $numero))             $bandeira = 'discover';
+            elseif (preg_match('/^(?:606282|3841)/', $numero))        $bandeira = 'hipercard';
+            elseif (preg_match('/^(?:4011|4312|4389|4514|4576|5041|5066|5067|509|6277|6362|6363|650|6516|6550)/', $numero)) $bandeira = 'elo';
+
+            $ultimos4  = substr($numero, -4);
+            // Token: hash do número completo + cvv + cliente (NUNCA salvar número completo)
+            $tokenHash = password_hash($numero . '|' . $cvv . '|' . clienteId(), PASSWORD_BCRYPT);
+
+            // Verificar duplicata (mesmos últimos 4 + bandeira + validade)
+            $dup = $pdo->prepare("SELECT id FROM cartoes_cliente WHERE cliente_id=? AND ultimos4=? AND bandeira=? AND mes_validade=? AND ano_validade=?");
+            $dup->execute([clienteId(),$ultimos4,$bandeira,$mes,$ano]);
+            if ($dup->fetch()) jsonResp(['success'=>false,'message'=>'Este cartão já está cadastrado.']);
+
+            // Se vai ser padrão, tira padrão dos outros
+            if ($padrao) $pdo->prepare("UPDATE cartoes_cliente SET padrao=0 WHERE cliente_id=?")->execute([clienteId()]);
+
+            $ins = $pdo->prepare("INSERT INTO cartoes_cliente (cliente_id,apelido,bandeira,ultimos4,nome_titular,mes_validade,ano_validade,token_hash,padrao) VALUES (?,?,?,?,?,?,?,?,?)");
+            $ins->execute([clienteId(),$apelido,$bandeira,$ultimos4,$nome,$mes,$ano,$tokenHash,$padrao]);
+            jsonResp(['success'=>true,'id'=>$pdo->lastInsertId(),'bandeira'=>$bandeira,'ultimos4'=>$ultimos4]);
+            break;
+
+        // ── Excluir cartão ───────────────────────────────────────────
+        case 'cartao_excluir':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Não autenticado.'],401);
+            $cartaoId = (int)($_POST['cartao_id'] ?? 0);
+            $del = $pdo->prepare("DELETE FROM cartoes_cliente WHERE id=? AND cliente_id=?");
+            $del->execute([$cartaoId, clienteId()]);
+            jsonResp(['success'=>true]);
+            break;
+
+        // ── Pagar com cartão ─────────────────────────────────────────
+        case 'pagar_cartao':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Faça login para finalizar.'],401);
+            $itens     = json_decode($_POST['itens'] ?? '[]', true);
+            $cartaoId  = (int)($_POST['cartao_id'] ?? 0);
+            $parcelas  = max(1, min(12, (int)($_POST['parcelas'] ?? 1)));
+            if (empty($itens)) jsonResp(['success'=>false,'message'=>'Carrinho vazio.']);
+            if (!$cartaoId)    jsonResp(['success'=>false,'message'=>'Selecione um cartão.']);
+
+            // Verifica que o cartão pertence ao cliente
+            $chkC = $pdo->prepare("SELECT id,bandeira,ultimos4 FROM cartoes_cliente WHERE id=? AND cliente_id=?");
+            $chkC->execute([$cartaoId, clienteId()]);
+            $cartao = $chkC->fetch();
+            if (!$cartao) jsonResp(['success'=>false,'message'=>'Cartão não encontrado.']);
+
+            // Migração automática das colunas extras
+            try {
+                $cols = $pdo->query("SHOW COLUMNS FROM pedidos LIKE 'forma_pagamento'")->fetchAll();
+                if (empty($cols)) {
+                    $pdo->exec("ALTER TABLE pedidos
+                        ADD COLUMN `forma_pagamento` VARCHAR(20) NOT NULL DEFAULT 'pix' AFTER `status`,
+                        ADD COLUMN `pix_txid`        VARCHAR(50) NULL AFTER `forma_pagamento`,
+                        ADD COLUMN `pix_pago`        TINYINT(1)  NOT NULL DEFAULT 0 AFTER `pix_txid`,
+                        ADD COLUMN `boleto_codigo`   VARCHAR(60) NULL AFTER `pix_pago`,
+                        ADD COLUMN `boleto_vencimento` DATE NULL AFTER `boleto_codigo`,
+                        ADD COLUMN `paypal_order_id` VARCHAR(80) NULL AFTER `boleto_vencimento`
+                    ");
+                }
+            } catch(\Exception $e){}
+
+            $pdo->beginTransaction();
+            $total = 0;
+            foreach ($itens as $i) $total += $i['quantidade'] * $i['preco'];
+
+            $s = $pdo->prepare("INSERT INTO pedidos (cliente_id,total,status,forma_pagamento) VALUES (?,?,'confirmado','cartao')");
+            $s->execute([clienteId(), $total]);
+            $pedidoId = $pdo->lastInsertId();
+
+            $si = $pdo->prepare("INSERT INTO pedido_itens (pedido_id,produto_id,quantidade,preco) VALUES (?,?,?,?)");
+            foreach ($itens as $i) $si->execute([$pedidoId,$i['produto_id'],$i['quantidade'],$i['preco']]);
+            $pdo->commit();
+
+            // Aqui seria feita a integração real com gateway (Stripe, PagSeguro, etc.)
+            // Por ora, simula aprovação com 95% de sucesso
+            $aprovado = (rand(1,100) <= 95);
+            if (!$aprovado) {
+                $pdo->exec("UPDATE pedidos SET status='cancelado' WHERE id=$pedidoId");
+                jsonResp(['success'=>false,'message'=>'Pagamento recusado pela operadora. Tente outro cartão.']);
+            }
+
+            jsonResp([
+                'success'   => true,
+                'pedido_id' => $pedidoId,
+                'bandeira'  => $cartao['bandeira'],
+                'ultimos4'  => $cartao['ultimos4'],
+                'parcelas'  => $parcelas,
+                'total'     => $total,
+            ]);
+            break;
+
+        // ══════════════════════════════════════════════════════════════
+        // BOLETO BANCÁRIO
+        // ══════════════════════════════════════════════════════════════
+        case 'gerar_boleto':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Faça login para finalizar.'],401);
+            $itens = json_decode($_POST['itens'] ?? '[]', true);
+            if (empty($itens)) jsonResp(['success'=>false,'message'=>'Carrinho vazio.']);
+
+            // Migração automática
+            try {
+                $cols = $pdo->query("SHOW COLUMNS FROM pedidos LIKE 'boleto_codigo'")->fetchAll();
+                if (empty($cols)) {
+                    $pdo->exec("ALTER TABLE pedidos
+                        ADD COLUMN IF NOT EXISTS `forma_pagamento` VARCHAR(20) NOT NULL DEFAULT 'pix' AFTER `status`,
+                        ADD COLUMN IF NOT EXISTS `pix_txid`        VARCHAR(50) NULL AFTER `forma_pagamento`,
+                        ADD COLUMN IF NOT EXISTS `pix_pago`        TINYINT(1)  NOT NULL DEFAULT 0 AFTER `pix_txid`,
+                        ADD COLUMN IF NOT EXISTS `boleto_codigo`   VARCHAR(60) NULL AFTER `pix_pago`,
+                        ADD COLUMN IF NOT EXISTS `boleto_vencimento` DATE NULL AFTER `boleto_codigo`,
+                        ADD COLUMN IF NOT EXISTS `paypal_order_id` VARCHAR(80) NULL AFTER `boleto_vencimento`
+                    ");
+                }
+            } catch(\Exception $e){}
+
+            $pdo->beginTransaction();
+            $total = 0;
+            foreach ($itens as $i) $total += $i['quantidade'] * $i['preco'];
+
+            // Gera código de boleto (padrão Febraban simplificado para demonstração)
+            $vencimento  = date('Y-m-d', strtotime('+3 days'));
+            $nossoNumero = str_pad(rand(1,99999999), 8, '0', STR_PAD_LEFT);
+            $cedente     = '0341'; // Código Itaú (exemplo)
+            $agencia     = '1234';
+            $conta        = '56789';
+            $totalCents  = str_pad(round($total * 100), 10, '0', STR_PAD_LEFT);
+            // Monta linha digitável fictícia mas bem formada (44 dígitos)
+            $campo1 = $cedente . '9' . substr($nossoNumero,0,5);
+            $campo2 = substr($nossoNumero,5,3) . $agencia . '1';
+            $campo3 = '000' . $conta . '0';
+            $fator  = '3921'; // fator de vencimento exemplo
+            $codigoBarra = "341" . "9" . $fator . $totalCents . $agencia . $nossoNumero . $conta . "000";
+            // Linha digitável formatada: campo1.digito campo2.digito campo3.digito digitoverif fatorvencto valor
+            $linhaDigitavel = substr($campo1,0,5).'.'.substr($campo1,5).' '
+                            . substr($campo2,0,5).'.'.substr($campo2,5).' '
+                            . substr($campo3,0,5).'.'.substr($campo3,5).' '
+                            . '1 ' . $fator . $totalCents;
+
+            $s = $pdo->prepare("INSERT INTO pedidos (cliente_id,total,status,forma_pagamento,boleto_codigo,boleto_vencimento) VALUES (?,?,'pendente','boleto',?,?)");
+            $s->execute([clienteId(), $total, $linhaDigitavel, $vencimento]);
+            $pedidoId = $pdo->lastInsertId();
+
+            $si = $pdo->prepare("INSERT INTO pedido_itens (pedido_id,produto_id,quantidade,preco) VALUES (?,?,?,?)");
+            foreach ($itens as $i) $si->execute([$pedidoId,$i['produto_id'],$i['quantidade'],$i['preco']]);
+            $pdo->commit();
+
+            jsonResp([
+                'success'         => true,
+                'pedido_id'       => $pedidoId,
+                'total'           => $total,
+                'linha_digitavel' => $linhaDigitavel,
+                'codigo_barras'   => $codigoBarra,
+                'vencimento'      => date('d/m/Y', strtotime($vencimento)),
+                'beneficiario'    => Config::PIX_NOME,
+            ]);
+            break;
+
+        // ══════════════════════════════════════════════════════════════
+        // PAYPAL
+        // ══════════════════════════════════════════════════════════════
+
+        // ── Cria order PayPal e retorna URL de aprovação ─────────────
+        case 'paypal_criar_order':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Faça login para finalizar.'],401);
+            $itens = json_decode($_POST['itens'] ?? '[]', true);
+            if (empty($itens)) jsonResp(['success'=>false,'message'=>'Carrinho vazio.']);
+
+            $total = 0;
+            foreach ($itens as $i) $total += $i['quantidade'] * $i['preco'];
+
+            // Credenciais PayPal (configure em config.php)
+            $clientId     = defined('Config::PAYPAL_CLIENT_ID') ? Config::PAYPAL_CLIENT_ID : (Config::PAYPAL_SANDBOX ? 'sb' : '');
+            $clientSecret = defined('Config::PAYPAL_SECRET')    ? Config::PAYPAL_SECRET    : '';
+            $baseUrl      = Config::PAYPAL_SANDBOX
+                ? 'https://api-m.sandbox.paypal.com'
+                : 'https://api-m.paypal.com';
+
+            // 1. Obtém token de acesso
+            $ctx = stream_context_create(['http'=>[
+                'method'  => 'POST',
+                'header'  => "Authorization: Basic ".base64_encode("$clientId:$clientSecret")."\r\nContent-Type: application/x-www-form-urlencoded\r\n",
+                'content' => 'grant_type=client_credentials',
+                'ignore_errors' => true,
+            ]]);
+            $tokenResp = @file_get_contents("$baseUrl/v1/oauth2/token", false, $ctx);
+            $tokenData = json_decode($tokenResp, true);
+            if (empty($tokenData['access_token']))
+                jsonResp(['success'=>false,'message'=>'Falha ao conectar com PayPal. Verifique as credenciais.']);
+
+            $accessToken = $tokenData['access_token'];
+
+            // URL de retorno
+            $returnUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . "://{$_SERVER['HTTP_HOST']}" . dirname($_SERVER['REQUEST_URI']) . '/index.php?paypal=ok';
+            $cancelUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . "://{$_SERVER['HTTP_HOST']}" . dirname($_SERVER['REQUEST_URI']) . '/index.php?paypal=cancelado';
+
+            // 2. Cria a order
+            $orderPayload = json_encode([
+                'intent' => 'CAPTURE',
+                'purchase_units' => [[
+                    'amount' => [
+                        'currency_code' => 'BRL',
+                        'value'         => number_format($total, 2, '.', ''),
+                    ],
+                    'description' => 'Pedido ' . Config::PIX_NOME,
+                ]],
+                'application_context' => [
+                    'return_url' => $returnUrl,
+                    'cancel_url' => $cancelUrl,
+                    'brand_name' => Config::PIX_NOME,
+                    'locale'     => 'pt-BR',
+                    'user_action'=> 'PAY_NOW',
+                ],
+            ]);
+            $ctx2 = stream_context_create(['http'=>[
+                'method'  => 'POST',
+                'header'  => "Authorization: Bearer $accessToken\r\nContent-Type: application/json\r\n",
+                'content' => $orderPayload,
+                'ignore_errors' => true,
+            ]]);
+            $orderResp = @file_get_contents("$baseUrl/v2/checkout/orders", false, $ctx2);
+            $orderData = json_decode($orderResp, true);
+            if (empty($orderData['id']))
+                jsonResp(['success'=>false,'message'=>'Erro ao criar order PayPal.']);
+
+            $orderId    = $orderData['id'];
+            $approveUrl = '';
+            foreach ($orderData['links'] as $link) {
+                if ($link['rel'] === 'approve') { $approveUrl = $link['href']; break; }
+            }
+
+            // Salva o pedido como pendente com o order_id do PayPal
+            try {
+                $cols = $pdo->query("SHOW COLUMNS FROM pedidos LIKE 'paypal_order_id'")->fetchAll();
+                if (empty($cols)) {
+                    $pdo->exec("ALTER TABLE pedidos ADD COLUMN IF NOT EXISTS `paypal_order_id` VARCHAR(80) NULL");
+                }
+            } catch(\Exception $e){}
+
+            $pdo->beginTransaction();
+            $sp = $pdo->prepare("INSERT INTO pedidos (cliente_id,total,status,forma_pagamento,paypal_order_id) VALUES (?,?,'pendente','paypal',?)");
+            $sp->execute([clienteId(), $total, $orderId]);
+            $pedidoId = $pdo->lastInsertId();
+
+            $si = $pdo->prepare("INSERT INTO pedido_itens (pedido_id,produto_id,quantidade,preco) VALUES (?,?,?,?)");
+            foreach ($itens as $i) $si->execute([$pedidoId,$i['produto_id'],$i['quantidade'],$i['preco']]);
+            $pdo->commit();
+
+            // Armazena pedido_id na sessão para capturar após retorno
+            $_SESSION['paypal_pedido_id'] = $pedidoId;
+            $_SESSION['paypal_itens']     = $itens;
+
+            jsonResp(['success'=>true,'approve_url'=>$approveUrl,'order_id'=>$orderId,'pedido_id'=>$pedidoId]);
+            break;
+
+        // ── Captura pagamento PayPal após retorno ────────────────────
+        case 'paypal_capturar':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Não autenticado.'],401);
+            $orderId  = trim($_POST['order_id'] ?? '');
+            $pedidoId = (int)($_SESSION['paypal_pedido_id'] ?? $_POST['pedido_id'] ?? 0);
+            if (!$orderId || !$pedidoId) jsonResp(['success'=>false,'message'=>'Dados inválidos.']);
+
+            $clientId     = Config::PAYPAL_CLIENT_ID;
+            $clientSecret = Config::PAYPAL_SECRET;
+            $baseUrl      = Config::PAYPAL_SANDBOX
+                ? 'https://api-m.sandbox.paypal.com'
+                : 'https://api-m.paypal.com';
+
+            // Token
+            $ctx = stream_context_create(['http'=>[
+                'method'  => 'POST',
+                'header'  => "Authorization: Basic ".base64_encode("$clientId:$clientSecret")."\r\nContent-Type: application/x-www-form-urlencoded\r\n",
+                'content' => 'grant_type=client_credentials',
+                'ignore_errors' => true,
+            ]]);
+            $tokenData = json_decode(@file_get_contents("$baseUrl/v1/oauth2/token", false, $ctx), true);
+            if (empty($tokenData['access_token']))
+                jsonResp(['success'=>false,'message'=>'Falha ao autenticar PayPal.']);
+
+            // Captura
+            $ctx2 = stream_context_create(['http'=>[
+                'method'  => 'POST',
+                'header'  => "Authorization: Bearer {$tokenData['access_token']}\r\nContent-Type: application/json\r\n",
+                'content' => '{}',
+                'ignore_errors' => true,
+            ]]);
+            $captureData = json_decode(@file_get_contents("$baseUrl/v2/checkout/orders/$orderId/capture", false, $ctx2), true);
+
+            $status = $captureData['status'] ?? '';
+            if ($status === 'COMPLETED') {
+                $pdo->prepare("UPDATE pedidos SET status='confirmado' WHERE id=? AND cliente_id=?")->execute([$pedidoId, clienteId()]);
+                unset($_SESSION['paypal_pedido_id'], $_SESSION['paypal_itens']);
+                jsonResp(['success'=>true,'pedido_id'=>$pedidoId]);
+            } else {
+                $pdo->prepare("UPDATE pedidos SET status='cancelado' WHERE id=?")->execute([$pedidoId]);
+                jsonResp(['success'=>false,'message'=>'Pagamento PayPal não concluído. Status: '.$status]);
+            }
+            break;
+
         // ── FINALIZAR PEDIDO (legado — mantido para compatibilidade) ─
         case 'pedido_criar':
             if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Faça login para finalizar.'],401);

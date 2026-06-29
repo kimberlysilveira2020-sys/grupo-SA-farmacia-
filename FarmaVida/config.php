@@ -22,10 +22,17 @@ class Config {
 
     // ── Configurações PIX ──────────────────────────────────────────
     // Preencha com os dados da sua conta PIX
-    const PIX_CHAVE       = 'farmaciavidasaudavel@email.com'; // Chave PIX: CPF, CNPJ, e-mail, telefone ou chave aleatória
-    const PIX_NOME        = 'FARMACIA VIDA SAUDAVEL';         // Nome do recebedor (máx 25 chars)
-    const PIX_CIDADE      = 'SAO PAULO';                      // Cidade do recebedor (máx 15 chars)
+    const PIX_CHAVE       = '137.277.219-79'; // Chave PIX: CPF, CNPJ, e-mail, telefone ou chave aleatória
+    const PIX_NOME        = 'Caio Eduardo Aguiar';         // Nome do recebedor (máx 25 chars)
+    const PIX_CIDADE      = 'JOINVILLE';                      // Cidade do recebedor (máx 15 chars)
     const PIX_IDENTIFICADOR = 'FARMAVIDA';                    // Identificador da loja no QR Code (máx 25 chars)
+    // ──────────────────────────────────────────────────────────────
+
+    // ── Configurações PayPal ───────────────────────────────────────
+    // Obtenha em: https://developer.paypal.com/dashboard/applications
+    const PAYPAL_SANDBOX   = true;                            // true = Sandbox (testes) | false = Produção
+    const PAYPAL_CLIENT_ID = 'SEU_PAYPAL_CLIENT_ID_AQUI';    // Client ID do app PayPal
+    const PAYPAL_SECRET    = 'SEU_PAYPAL_SECRET_AQUI';        // Secret do app PayPal
     // ──────────────────────────────────────────────────────────────
 
     public static function initApp() {

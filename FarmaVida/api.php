@@ -450,6 +450,119 @@ try {
             json_response(['success'=>true,'categorias'=>$cats]);
             break;
 
+        // ══════════════════════════════════════════════════════════════
+        // PEDIDOS DA LOJA (painel admin)
+        // ══════════════════════════════════════════════════════════════
+
+        case 'pedidos_loja_listar':
+            $status  = $_GET['status']  ?? '';
+            $busca   = trim($_GET['busca'] ?? '');
+            $where   = ['1=1'];
+            $params  = [];
+
+            if ($status && $status !== 'todos') {
+                $where[]          = 'p.status = :status';
+                $params[':status'] = $status;
+            }
+            if ($busca) {
+                $where[]        = '(cl.nome LIKE :busca OR p.id = :pid OR cl.email LIKE :busca2)';
+                $params[':busca']  = "%$busca%";
+                $params[':busca2'] = "%$busca%";
+                $params[':pid']    = is_numeric($busca) ? (int)$busca : 0;
+            }
+
+            $whereSQL = implode(' AND ', $where);
+            $stmt = $pdo->prepare("
+                SELECT p.id, p.status, p.total, p.forma_pagamento, p.pix_pago,
+                       p.boleto_codigo, p.boleto_vencimento, p.pix_txid,
+                       p.criado_em,
+                       cl.nome AS cliente_nome, cl.email AS cliente_email, cl.telefone AS cliente_tel,
+                       COUNT(pi.id) AS qtd_itens
+                FROM pedidos p
+                INNER JOIN clientes_loja cl ON cl.id = p.cliente_id
+                LEFT  JOIN pedido_itens pi  ON pi.pedido_id = p.id
+                WHERE $whereSQL
+                GROUP BY p.id
+                ORDER BY p.criado_em DESC
+            ");
+            $stmt->execute($params);
+            $pedidos = $stmt->fetchAll();
+
+            // Totalizadores — query independente sem JOIN para sempre retornar todos os status
+            $tots = $pdo->query("
+                SELECT status,
+                       COUNT(*) AS qtd,
+                       COALESCE(SUM(total),0) AS soma
+                FROM pedidos
+                GROUP BY status
+                UNION ALL
+                SELECT 'total_geral' AS status,
+                       COUNT(*) AS qtd,
+                       COALESCE(SUM(total),0) AS soma
+                FROM pedidos
+            ")->fetchAll(PDO::FETCH_ASSOC);
+            $resumo = [];
+            foreach ($tots as $t) $resumo[$t['status']] = $t;
+
+            json_response(['success'=>true,'pedidos'=>$pedidos,'resumo'=>$resumo]);
+            break;
+
+        case 'pedido_loja_detalhes':
+            $id = (int)($_GET['id'] ?? 0);
+            if (!$id) json_response(['success'=>false,'message'=>'ID inválido.']);
+
+            $p = $pdo->prepare("
+                SELECT p.*, cl.nome AS cliente_nome, cl.email AS cliente_email,
+                       cl.telefone AS cliente_tel, cl.cpf AS cliente_cpf
+                FROM pedidos p
+                INNER JOIN clientes_loja cl ON cl.id = p.cliente_id
+                WHERE p.id = ?
+            ");
+            $p->execute([$id]);
+            $pedido = $p->fetch();
+            if (!$pedido) json_response(['success'=>false,'message'=>'Pedido não encontrado.']);
+
+            $itens = $pdo->prepare("
+                SELECT pi.quantidade, pi.preco,
+                       pr.nome AS produto_nome, pr.fabricante, pr.categoria
+                FROM pedido_itens pi
+                INNER JOIN produtos pr ON pr.id = pi.produto_id
+                WHERE pi.pedido_id = ?
+            ");
+            $itens->execute([$id]);
+            $pedido['itens'] = $itens->fetchAll();
+
+            json_response(['success'=>true,'pedido'=>$pedido]);
+            break;
+
+        case 'pedido_loja_status':
+            $id     = (int)($_POST['id'] ?? 0);
+            $status = $_POST['status'] ?? '';
+            $validos = ['pendente','confirmado','cancelado'];
+            if (!$id || !in_array($status, $validos))
+                json_response(['success'=>false,'message'=>'Dados inválidos.']);
+
+            $pdo->prepare("UPDATE pedidos SET status=? WHERE id=?")
+                ->execute([$status, $id]);
+            json_response(['success'=>true,'message'=>'Status atualizado.']);
+            break;
+
+        case 'pedido_loja_pix_confirmar':
+            $id = (int)($_POST['id'] ?? 0);
+            if (!$id) json_response(['success'=>false,'message'=>'ID inválido.']);
+            $pdo->prepare("UPDATE pedidos SET pix_pago=1, status='confirmado' WHERE id=?")
+                ->execute([$id]);
+            json_response(['success'=>true,'message'=>'Pagamento PIX confirmado.']);
+            break;
+
+        case 'pedido_loja_deletar':
+            $id = (int)($_POST['id'] ?? 0);
+            if (!$id) json_response(['success'=>false,'message'=>'ID inválido.']);
+            $pdo->prepare("DELETE FROM pedido_itens WHERE pedido_id=?")->execute([$id]);
+            $pdo->prepare("DELETE FROM pedidos WHERE id=?")->execute([$id]);
+            json_response(['success'=>true,'message'=>'Pedido removido.']);
+            break;
+
         default:
             json_response(['success' => false, 'message' => 'Endpoint não encontrado.'], 404);
     }
