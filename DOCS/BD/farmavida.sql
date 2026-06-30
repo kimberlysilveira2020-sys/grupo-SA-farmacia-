@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Tempo de geração: 23/06/2026 às 03:15
+-- Tempo de geração: 30/06/2026 às 00:25
 -- Versão do servidor: 10.4.32-MariaDB
 -- Versão do PHP: 8.2.12
 
@@ -64,6 +64,26 @@ CREATE TABLE `caixa` (
   `fechado_em` datetime DEFAULT NULL,
   `status` enum('aberto','fechado') DEFAULT 'aberto',
   `observacao` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `cartoes_cliente`
+--
+
+CREATE TABLE `cartoes_cliente` (
+  `id` int(11) NOT NULL,
+  `cliente_id` int(11) NOT NULL,
+  `apelido` varchar(40) NOT NULL DEFAULT '',
+  `bandeira` varchar(20) NOT NULL DEFAULT 'visa',
+  `ultimos4` char(4) NOT NULL,
+  `nome_titular` varchar(60) NOT NULL,
+  `mes_validade` char(2) NOT NULL,
+  `ano_validade` char(4) NOT NULL,
+  `token_hash` varchar(255) NOT NULL COMMENT 'hash seguro — NUNCA armazene o número completo',
+  `padrao` tinyint(1) NOT NULL DEFAULT 0,
+  `criado_em` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -243,6 +263,9 @@ CREATE TABLE `pedidos` (
   `forma_pagamento` enum('credito','pix','paypal','boleto') DEFAULT 'pix',
   `pix_txid` varchar(50) DEFAULT NULL,
   `pix_pago` tinyint(1) NOT NULL DEFAULT 0,
+  `boleto_codigo` varchar(60) DEFAULT NULL,
+  `boleto_vencimento` date DEFAULT NULL,
+  `paypal_order_id` varchar(80) DEFAULT NULL,
   `criado_em` datetime DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -250,13 +273,16 @@ CREATE TABLE `pedidos` (
 -- Despejando dados para a tabela `pedidos`
 --
 
-INSERT INTO `pedidos` (`id`, `cliente_id`, `status`, `total`, `forma_pagamento`, `pix_txid`, `pix_pago`, `criado_em`) VALUES
-(8, 1, 'pendente', 29.90, 'pix', NULL, 0, '2026-06-22 21:38:49'),
-(9, 1, 'pendente', 74.90, 'pix', NULL, 0, '2026-06-22 21:49:11'),
-(10, 1, 'pendente', 18.90, 'pix', 'FV9DB502F21984', 0, '2026-06-22 22:03:12'),
-(11, 1, 'pendente', 8.00, 'pix', 'FV9DC11164D757', 0, '2026-06-22 22:06:25'),
-(12, 1, 'pendente', 159.90, 'pix', 'FV9DC266927657', 0, '2026-06-22 22:06:46'),
-(14, 1, 'pendente', 159.90, 'pix', 'FV9DC9A9B4E893', 0, '2026-06-22 22:08:42');
+INSERT INTO `pedidos` (`id`, `cliente_id`, `status`, `total`, `forma_pagamento`, `pix_txid`, `pix_pago`, `boleto_codigo`, `boleto_vencimento`, `paypal_order_id`, `criado_em`) VALUES
+(8, 1, 'pendente', 29.90, 'pix', NULL, 0, NULL, NULL, NULL, '2026-06-22 21:38:49'),
+(9, 1, 'pendente', 74.90, 'pix', NULL, 0, NULL, NULL, NULL, '2026-06-22 21:49:11'),
+(10, 1, 'pendente', 18.90, 'pix', 'FV9DB502F21984', 0, NULL, NULL, NULL, '2026-06-22 22:03:12'),
+(11, 1, 'pendente', 8.00, 'pix', 'FV9DC11164D757', 0, NULL, NULL, NULL, '2026-06-22 22:06:25'),
+(12, 1, 'pendente', 159.90, 'pix', 'FV9DC266927657', 0, NULL, NULL, NULL, '2026-06-22 22:06:46'),
+(14, 1, 'pendente', 159.90, 'pix', 'FV9DC9A9B4E893', 0, NULL, NULL, NULL, '2026-06-22 22:08:42'),
+(18, 1, 'pendente', 8.00, 'boleto', NULL, 0, '03419.21591 63112.341 00056.7890 1 39210000000800', '2026-07-03', NULL, '2026-06-29 19:18:37'),
+(20, 1, 'pendente', 167.90, 'boleto', NULL, 0, '03419.82219 85112.341 00056.7890 1 39210000016790', '2026-07-03', NULL, '2026-06-29 19:19:14'),
+(21, 1, 'pendente', 167.90, 'pix', NULL, 0, NULL, NULL, NULL, '2026-06-29 19:19:18');
 
 -- --------------------------------------------------------
 
@@ -297,7 +323,12 @@ INSERT INTO `pedido_itens` (`id`, `pedido_id`, `produto_id`, `quantidade`, `prec
 (10, 10, 85, 1, 18.90),
 (11, 11, 61, 1, 8.00),
 (12, 12, 75, 1, 159.90),
-(14, 14, 75, 1, 159.90);
+(14, 14, 75, 1, 159.90),
+(18, 18, 61, 1, 8.00),
+(20, 20, 61, 1, 8.00),
+(21, 20, 75, 1, 159.90),
+(22, 21, 61, 1, 8.00),
+(23, 21, 75, 1, 159.90);
 
 -- --------------------------------------------------------
 
@@ -413,6 +444,13 @@ ALTER TABLE `caixa`
   ADD KEY `usuario_id` (`usuario_id`);
 
 --
+-- Índices de tabela `cartoes_cliente`
+--
+ALTER TABLE `cartoes_cliente`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_cartao_cliente` (`cliente_id`);
+
+--
 -- Índices de tabela `categorias`
 --
 ALTER TABLE `categorias`
@@ -465,7 +503,9 @@ ALTER TABLE `lotes`
 ALTER TABLE `pedidos`
   ADD PRIMARY KEY (`id`),
   ADD KEY `cliente_id` (`cliente_id`),
-  ADD KEY `idx_pix_txid` (`pix_txid`);
+  ADD KEY `idx_pix_txid` (`pix_txid`),
+  ADD KEY `idx_paypal_order` (`paypal_order_id`),
+  ADD KEY `idx_boleto_codigo` (`boleto_codigo`);
 
 --
 -- Índices de tabela `pedidos_loja`
@@ -521,6 +561,12 @@ ALTER TABLE `caixa`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de tabela `cartoes_cliente`
+--
+ALTER TABLE `cartoes_cliente`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT de tabela `categorias`
 --
 ALTER TABLE `categorias`
@@ -560,7 +606,7 @@ ALTER TABLE `lotes`
 -- AUTO_INCREMENT de tabela `pedidos`
 --
 ALTER TABLE `pedidos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- AUTO_INCREMENT de tabela `pedidos_loja`
@@ -572,7 +618,7 @@ ALTER TABLE `pedidos_loja`
 -- AUTO_INCREMENT de tabela `pedido_itens`
 --
 ALTER TABLE `pedido_itens`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
 
 --
 -- AUTO_INCREMENT de tabela `produtos`
@@ -601,6 +647,12 @@ ALTER TABLE `vendas`
 --
 ALTER TABLE `caixa`
   ADD CONSTRAINT `caixa_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`);
+
+--
+-- Restrições para tabelas `cartoes_cliente`
+--
+ALTER TABLE `cartoes_cliente`
+  ADD CONSTRAINT `fk_cartao_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes_loja` (`id`) ON DELETE CASCADE;
 
 --
 -- Restrições para tabelas `itens_pedido_loja`
