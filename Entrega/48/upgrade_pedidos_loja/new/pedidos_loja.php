@@ -12,9 +12,6 @@ $extra_css = <<<CSS
     display:flex; align-items:center; gap:14px; background:#fff;
     box-shadow:0 2px 8px rgba(0,0,0,.08);
 }
-.resumo-card { transition: box-shadow .15s, transform .15s; }
-.resumo-card:hover { box-shadow:0 4px 16px rgba(25,135,84,.18); transform:translateY(-2px); }
-.resumo-card.ativo { box-shadow:0 0 0 2.5px #198754; }
 .resumo-card .icon { font-size:2rem; width:44px; text-align:center; }
 .resumo-card .info .num  { font-size:1.5rem; font-weight:800; line-height:1; }
 .resumo-card .info .label{ font-size:.75rem; color:#666; margin-top:2px; }
@@ -35,10 +32,9 @@ $extra_css = <<<CSS
     display:inline-block; padding:4px 10px; border-radius:20px;
     font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
 }
-.bs-pendente               { background:#fff3cd; color:#856404; }
-.bs-confirmado             { background:#d1e7dd; color:#0a3622; }
-.bs-cancelado              { background:#f8d7da; color:#58151c; }
-.bs-aguardando_confirmacao { background:#cfe2ff; color:#084298; } /* Pix declarado — aguarda validação */
+.bs-pendente   { background:#fff3cd; color:#856404; }
+.bs-confirmado { background:#d1e7dd; color:#0a3622; }
+.bs-cancelado  { background:#f8d7da; color:#58151c; }
 
 /* ── Badges pagamento ────────────────────────────── */
 .badge-pgto {
@@ -130,28 +126,28 @@ include 'header.php';
 
     <!-- Cards de resumo -->
     <div class="resumo-cards" id="resumo-cards">
-        <div class="resumo-card" style="cursor:pointer;" title="Filtrar pendentes" onclick="filtrarPorStatus('pendente')">
+        <div class="resumo-card">
             <div class="icon text-secondary"><i class="bi bi-hourglass-split"></i></div>
             <div class="info">
                 <div class="num" id="res-pendente">—</div>
                 <div class="label">Pendentes</div>
             </div>
         </div>
-        <div class="resumo-card" style="cursor:pointer;" title="Filtrar confirmados" onclick="filtrarPorStatus('confirmado')">
+        <div class="resumo-card">
             <div class="icon text-success"><i class="bi bi-check-circle-fill"></i></div>
             <div class="info">
                 <div class="num" id="res-confirmado">—</div>
                 <div class="label">Confirmados</div>
             </div>
         </div>
-        <div class="resumo-card" style="cursor:pointer;" title="Filtrar cancelados" onclick="filtrarPorStatus('cancelado')">
+        <div class="resumo-card">
             <div class="icon text-danger"><i class="bi bi-x-circle-fill"></i></div>
             <div class="info">
                 <div class="num" id="res-cancelado">—</div>
                 <div class="label">Cancelados</div>
             </div>
         </div>
-        <div class="resumo-card" style="cursor:pointer;" title="Ver todos" onclick="filtrarPorStatus('todos')">
+        <div class="resumo-card">
             <div class="icon text-primary"><i class="bi bi-currency-dollar"></i></div>
             <div class="info">
                 <div class="num" id="res-total">—</div>
@@ -167,7 +163,6 @@ include 'header.php';
         <select id="filtro-status" onchange="carregarPedidos()">
             <option value="todos">Todos os status</option>
             <option value="pendente">Pendentes</option>
-            <option value="aguardando_confirmacao">Aguard. Confirmação (PIX)</option>
             <option value="confirmado">Confirmados</option>
             <option value="cancelado">Cancelados</option>
         </select>
@@ -220,26 +215,17 @@ include 'header.php';
 </div>
 
 <!-- ══ MODAL CONFIRMAR AÇÃO ══ -->
-<div class="modal fade" id="modalConfirmar" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
-        <div class="modal-content" style="border-radius:16px;overflow:hidden;border:none;box-shadow:0 8px 32px rgba(0,0,0,.18);">
-            <div class="modal-header border-0 pb-0" id="mc-header" style="padding:24px 24px 10px;">
-                <div style="display:flex;align-items:center;gap:12px;width:100%;">
-                    <div id="mc-icon" style="width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.4rem;"></div>
-                    <div>
-                        <h5 class="modal-title mb-0 fw-bold" id="mc-titulo"></h5>
-                        <small id="mc-subtitulo" style="color:#888;"></small>
-                    </div>
-                </div>
+<div class="modal fade" id="modalConfirmar" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mc-titulo">Confirmar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="mc-corpo" style="padding:14px 24px 10px;font-size:.9rem;color:#444;"></div>
-            <div class="modal-footer border-0" style="padding:10px 24px 20px;gap:10px;">
-                <button class="btn btn-light fw-600" style="border-radius:10px;padding:9px 22px;" data-bs-dismiss="modal">
-                    <i class="bi bi-x-lg me-1"></i>Cancelar
-                </button>
-                <button class="btn fw-bold" id="mc-btn-ok" style="border-radius:10px;padding:9px 22px;min-width:130px;">
-                    Confirmar
-                </button>
+            <div class="modal-body" id="mc-corpo"></div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-danger" id="mc-btn-ok" onclick="executarAcao()">Confirmar</button>
             </div>
         </div>
     </div>
@@ -268,18 +254,6 @@ function debounceCarregar() {
     _debounce = setTimeout(carregarPedidos, 400);
 }
 
-function filtrarPorStatus(status) {
-    document.getElementById('filtro-status').value = status;
-    document.querySelectorAll('.resumo-card').forEach(c => c.classList.remove('ativo'));
-    if (status !== 'todos') {
-        const map = { pendente:0, confirmado:1, cancelado:2 };
-        const idx = map[status];
-        if (idx !== undefined)
-            document.querySelectorAll('.resumo-card')[idx]?.classList.add('ativo');
-    }
-    carregarPedidos();
-}
-
 // ════════════════════════════════════════════════════
 // CARREGAR PEDIDOS
 // ════════════════════════════════════════════════════
@@ -299,7 +273,7 @@ async function carregarPedidos() {
         let pedidos = d.pedidos;
         if (pgto) pedidos = pedidos.filter(p => p.forma_pagamento === pgto);
 
-        renderResumo(d.resumo);
+        renderResumo(d.resumo, d.pedidos);
         renderTabela(pedidos);
     } catch(e) {
         console.error(e);
@@ -308,30 +282,12 @@ async function carregarPedidos() {
     } finally { loading(false); }
 }
 
-function renderResumo(resumo) {
-    const get     = (k, f) => resumo[k] ? Number(resumo[k][f]) : 0;
-    const animNum = (elId, val) => {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        const prev = parseInt(el.textContent) || 0;
-        if (prev === val) return;
-        el.style.transition = 'transform .15s, opacity .15s';
-        el.style.transform  = 'scale(1.25)';
-        el.style.opacity    = '.5';
-        setTimeout(() => {
-            el.textContent      = val;
-            el.style.transform  = 'scale(1)';
-            el.style.opacity    = '1';
-        }, 150);
-    };
-
-    animNum('res-pendente',   get('pendente',   'qtd'));
-    animNum('res-confirmado', get('confirmado', 'qtd'));
-    animNum('res-cancelado',  get('cancelado',  'qtd'));
-
-    const totalConf = get('confirmado', 'soma');
-    const elTotal   = document.getElementById('res-total');
-    if (elTotal) elTotal.textContent = fmtBRL(totalConf);
+function renderResumo(resumo, todos) {
+    const get = (k, field) => resumo[k] ? resumo[k][field] : 0;
+    document.getElementById('res-pendente').textContent   = get('pendente','qtd');
+    document.getElementById('res-confirmado').textContent = get('confirmado','qtd');
+    document.getElementById('res-cancelado').textContent  = get('cancelado','qtd');
+    document.getElementById('res-total').textContent      = fmtBRL(get('confirmado','soma'));
 }
 
 function renderTabela(pedidos) {
@@ -370,8 +326,8 @@ function renderTabela(pedidos) {
                     <button class="btn btn-sm btn-outline-success" title="Ver detalhes" onclick="verDetalhes(${p.id})">
                         <i class="bi bi-eye"></i>
                     </button>
-                    ${(p.status === 'pendente' || p.status === 'aguardando_confirmacao') ? `
-                    <button class="btn btn-sm btn-success" title="${p.status === 'aguardando_confirmacao' ? '⚡ Confirmar PIX declarado' : 'Confirmar pedido'}" onclick="alterarStatus(${p.id},'confirmado')">
+                    ${p.status === 'pendente' ? `
+                    <button class="btn btn-sm btn-success" title="Confirmar pedido" onclick="alterarStatus(${p.id},'confirmado')">
                         <i class="bi bi-check-lg"></i>
                     </button>` : ''}
                     ${p.status !== 'cancelado' ? `
@@ -551,70 +507,18 @@ function copiarDetPix() {
 }
 
 // ════════════════════════════════════════════════════
-// MODAL DE CONFIRMAÇÃO CUSTOMIZADO
-// ════════════════════════════════════════════════════
-let _confirmarCallback = null;
-
-const _confirmarCfg = {
-    confirmado: {
-        icon: 'bi-check-circle-fill', iconBg: '#d1e7dd', iconColor: '#0a3622',
-        titulo: 'Confirmar Pedido', subtitulo: 'Esta ação irá aprovar o pedido',
-        btnClass: 'btn-success', btnLabel: '<i class="bi bi-check-lg me-1"></i>Sim, confirmar'
-    },
-    cancelado: {
-        icon: 'bi-x-circle-fill', iconBg: '#f8d7da', iconColor: '#58151c',
-        titulo: 'Cancelar Pedido', subtitulo: 'O pedido será marcado como cancelado',
-        btnClass: 'btn-danger', btnLabel: '<i class="bi bi-x-lg me-1"></i>Sim, cancelar'
-    },
-    deletar: {
-        icon: 'bi-trash3-fill', iconBg: '#fff3cd', iconColor: '#856404',
-        titulo: 'Excluir Pedido', subtitulo: 'Esta ação não pode ser desfeita',
-        btnClass: 'btn-warning text-dark', btnLabel: '<i class="bi bi-trash3 me-1"></i>Sim, excluir'
-    },
-    pix: {
-        icon: 'bi-qr-code-scan', iconBg: '#d1e7dd', iconColor: '#0a3622',
-        titulo: 'Confirmar Pagamento PIX', subtitulo: 'Marcar como recebido',
-        btnClass: 'btn-success', btnLabel: '<i class="bi bi-check-circle-fill me-1"></i>Confirmar PIX'
-    }
-};
-
-function showConfirmar(tipo, id, mensagem, callback) {
-    const cfg = _confirmarCfg[tipo];
-    _confirmarCallback = callback;
-
-    document.getElementById('mc-icon').style.background    = cfg.iconBg;
-    document.getElementById('mc-icon').style.color         = cfg.iconColor;
-    document.getElementById('mc-icon').innerHTML           = `<i class="bi ${cfg.icon}"></i>`;
-    document.getElementById('mc-titulo').textContent       = cfg.titulo;
-    document.getElementById('mc-subtitulo').textContent    = cfg.subtitulo;
-    document.getElementById('mc-corpo').innerHTML          = mensagem;
-
-    const btn = document.getElementById('mc-btn-ok');
-    btn.className  = `btn fw-bold ${cfg.btnClass}`;
-    btn.style      = 'border-radius:10px;padding:9px 22px;min-width:130px;';
-    btn.innerHTML  = cfg.btnLabel;
-    btn.onclick    = () => {
-        bootstrap.Modal.getInstance(document.getElementById('modalConfirmar'))?.hide();
-        callback();
-    };
-
-    new bootstrap.Modal(document.getElementById('modalConfirmar')).show();
-}
-
-// ════════════════════════════════════════════════════
 // AÇÕES
 // ════════════════════════════════════════════════════
 async function alterarStatus(id, novoStatus) {
-    const msgs = {
-        confirmado: `Deseja <strong>confirmar</strong> o pedido <strong>#${id}</strong>?<br><small class="text-muted">O status será atualizado para Confirmado.</small>`,
-        cancelado:  `Deseja <strong>cancelar</strong> o pedido <strong>#${id}</strong>?<br><small class="text-muted">O cliente será notificado do cancelamento.</small>`
-    };
-    showConfirmar(novoStatus, id, msgs[novoStatus] || '', () => _alterarStatus(id, novoStatus));
+    const labels = { confirmado:'confirmar', cancelado:'cancelar' };
+    if (!confirm(`Deseja ${labels[novoStatus]||'alterar'} o pedido #${id}?`)) return;
+    await _alterarStatus(id, novoStatus);
 }
 
 async function alterarStatusModal(id, novoStatus) {
+    // Fecha modal de detalhes e altera
     bootstrap.Modal.getInstance(document.getElementById('modalDetalhes'))?.hide();
-    setTimeout(() => alterarStatus(id, novoStatus), 300);
+    await alterarStatus(id, novoStatus);
 }
 
 async function _alterarStatus(id, status) {
@@ -624,42 +528,34 @@ async function _alterarStatus(id, status) {
     const r = await fetch(`${API}?endpoint=pedido_loja_status`, {method:'POST', body:fd});
     const d = await r.json();
     loading(false);
-    if (d.success) carregarPedidos();
+    if (d.success) { carregarPedidos(); }
     else alert('Erro: ' + d.message);
 }
 
 async function confirmarPix(id) {
-    showConfirmar('pix', id,
-        `Confirmar recebimento do pagamento PIX do pedido <strong>#${id}</strong>?<br>
-         <small class="text-muted">O status do pedido será alterado para <strong>Confirmado</strong>.</small>`,
-        async () => {
-            loading(true);
-            const fd = new FormData(); fd.append('id', id);
-            const r = await fetch(`${API}?endpoint=pedido_loja_pix_confirmar`, {method:'POST', body:fd});
-            const d = await r.json();
-            loading(false);
-            if (d.success) {
-                bootstrap.Modal.getInstance(document.getElementById('modalDetalhes'))?.hide();
-                carregarPedidos();
-            } else alert('Erro: ' + d.message);
-        }
-    );
+    if (!confirm(`Confirmar pagamento PIX do pedido #${id}?`)) return;
+    loading(true);
+    const fd = new FormData();
+    fd.append('id', id);
+    const r = await fetch(`${API}?endpoint=pedido_loja_pix_confirmar`, {method:'POST', body:fd});
+    const d = await r.json();
+    loading(false);
+    if (d.success) {
+        bootstrap.Modal.getInstance(document.getElementById('modalDetalhes'))?.hide();
+        carregarPedidos();
+    } else alert('Erro: ' + d.message);
 }
 
 async function excluirPedido(id) {
-    showConfirmar('deletar', id,
-        `Excluir permanentemente o pedido <strong>#${id}</strong>?<br>
-         <small class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Todos os itens do pedido também serão removidos.</small>`,
-        async () => {
-            loading(true);
-            const fd = new FormData(); fd.append('id', id);
-            const r = await fetch(`${API}?endpoint=pedido_loja_deletar`, {method:'POST', body:fd});
-            const d = await r.json();
-            loading(false);
-            if (d.success) carregarPedidos();
-            else alert('Erro: ' + d.message);
-        }
-    );
+    if (!confirm(`Excluir permanentemente o pedido #${id}?\nEsta ação não pode ser desfeita.`)) return;
+    loading(true);
+    const fd = new FormData();
+    fd.append('id', id);
+    const r = await fetch(`${API}?endpoint=pedido_loja_deletar`, {method:'POST', body:fd});
+    const d = await r.json();
+    loading(false);
+    if (d.success) carregarPedidos();
+    else alert('Erro: ' + d.message);
 }
 
 function esc(s) {

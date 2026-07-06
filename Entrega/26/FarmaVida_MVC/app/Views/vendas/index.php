@@ -1,90 +1,5 @@
-<?php
-require_once 'config.php';
-if (!isset($_SESSION['usuario_id'])) { header("Location: login.php"); exit; }
-
-$pdo = Config::getDbConnection();
-
-// ── Caixa atual do usuário ──────────────────────────────────────────
-$stmtCaixa = $pdo->prepare("SELECT * FROM caixa WHERE usuario_id = ? AND status = 'aberto' ORDER BY aberto_em DESC LIMIT 1");
-$stmtCaixa->execute([$_SESSION['usuario_id']]);
-$caixaAberto = $stmtCaixa->fetch();
-
-// ── Totais do caixa atual ───────────────────────────────────────────
-$totalCaixa = 0;
-$qtdVendasCaixa = 0;
-if ($caixaAberto) {
-    $stmtTot = $pdo->prepare("SELECT COUNT(*) AS qtd, COALESCE(SUM(total),0) AS soma FROM vendas WHERE caixa_id = ?");
-    $stmtTot->execute([$caixaAberto['id']]);
-    $totRow = $stmtTot->fetch();
-    $totalCaixa    = $totRow['soma'];
-    $qtdVendasCaixa = $totRow['qtd'];
-}
-
-// ── Filtros da listagem ─────────────────────────────────────────────
-$filtroData  = $_GET['data']  ?? date('Y-m-d');
-$filtroData2 = $_GET['data2'] ?? date('Y-m-d');
-
-$stmtVendas = $pdo->prepare("
-    SELECT v.id, v.data_venda, v.total, v.supervisor_liberacao,
-           u.nome AS vendedor, u.cargo AS cargo_vendedor,
-           c.nome AS cliente_nome,
-           cx.id AS caixa_id
-    FROM vendas v
-    INNER JOIN usuarios u ON v.usuario_id = u.id
-    LEFT JOIN clientes c ON v.cliente_id = c.id
-    LEFT JOIN caixa cx   ON v.caixa_id   = cx.id
-    WHERE DATE(v.data_venda) BETWEEN ? AND ?
-    ORDER BY v.data_venda DESC
-");
-$stmtVendas->execute([$filtroData, $filtroData2]);
-$vendas = $stmtVendas->fetchAll();
-
-$totalPeriodo = array_sum(array_column($vendas, 'total'));
-$qtdPeriodo   = count($vendas);
-
-// ── Vendas online (Pedidos da Loja) no período ──────────────────────
-// Considera apenas pedidos confirmados como venda efetivada
-$stmtOnline = $pdo->prepare("
-    SELECT p.id, p.criado_em, p.total, p.status, p.forma_pagamento, p.pix_pago,
-           p.boleto_codigo, p.paypal_order_id,
-           cl.nome AS cliente_nome, cl.email AS cliente_email, cl.telefone AS cliente_tel,
-           COUNT(pi.id) AS qtd_itens
-    FROM pedidos p
-    INNER JOIN clientes_loja cl ON cl.id = p.cliente_id
-    LEFT JOIN pedido_itens pi ON pi.pedido_id = p.id
-    WHERE p.status = 'confirmado' AND DATE(p.criado_em) BETWEEN ? AND ?
-    GROUP BY p.id
-    ORDER BY p.criado_em DESC
-");
-$stmtOnline->execute([$filtroData, $filtroData2]);
-$vendasOnline = $stmtOnline->fetchAll();
-
-$totalOnlinePeriodo = array_sum(array_column($vendasOnline, 'total'));
-$qtdOnlinePeriodo   = count($vendasOnline);
-
-// ── Totais gerais (PDV + Loja Online) ───────────────────────────────
-$totalGeralPeriodo = $totalPeriodo + $totalOnlinePeriodo;
-$qtdGeralPeriodo   = $qtdPeriodo + $qtdOnlinePeriodo;
-
-// ── Histórico de caixas ─────────────────────────────────────────────
-$stmtHist = $pdo->prepare("
-    SELECT cx.*, u.nome AS operador,
-           COUNT(v.id) AS qtd_vendas,
-           COALESCE(SUM(v.total),0) AS total_vendas
-    FROM caixa cx
-    INNER JOIN usuarios u ON cx.usuario_id = u.id
-    LEFT JOIN vendas v ON v.caixa_id = cx.id
-    GROUP BY cx.id
-    ORDER BY cx.aberto_em DESC
-    LIMIT 20
-");
-$stmtHist->execute();
-$historicoCaixas = $stmtHist->fetchAll();
-
-$page_title = "Vendas & Caixa";
-include 'header.php';
-?>
-
+<?php $base = BASE_URL; ?>
+<script>const BASE_URL = '<?= $base ?>';</script>
 <div class="container-fluid fade-in pb-5">
 
     <h2 class="mb-4"><i class="bi bi-cash-stack"></i> Vendas & Controle de Caixa</h2>
@@ -153,34 +68,6 @@ include 'header.php';
         </div>
     </div>
 
-    <!-- ══ RESUMO LOJA ONLINE ═══════════════════════════════════════ -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-6">
-            <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg,#6a1b9a,#4a148c); color:#fff;">
-                <div class="card-body py-4">
-                    <p class="mb-1 opacity-75 small"><i class="bi bi-bag-check-fill"></i> Vendas online no período (loja)</p>
-                    <h2 class="fw-bold mb-0"><?= $qtdOnlinePeriodo ?></h2>
-                    <hr style="border-color:rgba(255,255,255,.3);">
-                    <p class="mb-1 opacity-75 small"><i class="bi bi-cash"></i> Total vendido online</p>
-                    <h3 class="fw-bold mb-0">R$ <?= number_format($totalOnlinePeriodo, 2, ',', '.') ?></h3>
-                    <small class="opacity-75">Somente pedidos confirmados · <?= date('d/m/Y', strtotime($filtroData)) ?> → <?= date('d/m/Y', strtotime($filtroData2)) ?></small>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg,#e65100,#bf360c); color:#fff;">
-                <div class="card-body py-4">
-                    <p class="mb-1 opacity-75 small"><i class="bi bi-graph-up-arrow"></i> Total geral do período (PDV + Loja)</p>
-                    <h2 class="fw-bold mb-0"><?= $qtdGeralPeriodo ?> <small class="fs-6 opacity-75">vendas</small></h2>
-                    <hr style="border-color:rgba(255,255,255,.3);">
-                    <p class="mb-1 opacity-75 small"><i class="bi bi-cash-stack"></i> Total arrecadado</p>
-                    <h3 class="fw-bold mb-0">R$ <?= number_format($totalGeralPeriodo, 2, ',', '.') ?></h3>
-                    <small class="opacity-75">PDV: R$ <?= number_format($totalPeriodo, 2, ',', '.') ?> &nbsp;|&nbsp; Loja: R$ <?= number_format($totalOnlinePeriodo, 2, ',', '.') ?></small>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- ══ RELATÓRIO DE VENDAS ══════════════════════════════════════ -->
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
@@ -242,67 +129,6 @@ include 'header.php';
             <div class="text-center py-5 text-muted">
                 <i class="bi bi-receipt" style="font-size:3rem;"></i>
                 <p class="mt-2">Nenhuma venda encontrada no período selecionado.</p>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- ══ VENDAS ONLINE (LOJA) ═══════════════════════════════════════ -->
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2"
-             style="background:#f8f9fa; border-bottom:1px solid #dee2e6;">
-            <span class="fw-bold"><i class="bi bi-bag-check-fill"></i> Vendas Online (Pedidos da Loja)</span>
-            <span class="text-muted small">Mesmo período do filtro acima · apenas pedidos confirmados</span>
-        </div>
-        <div class="card-body p-0">
-            <?php if (!empty($vendasOnline)): ?>
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead style="background:#f3e5f5;">
-                        <tr>
-                            <th class="ps-3">#</th>
-                            <th>Data/Hora</th>
-                            <th>Cliente</th>
-                            <th>Contato</th>
-                            <th>Pagamento</th>
-                            <th class="text-center">Itens</th>
-                            <th class="text-end pe-3">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($vendasOnline as $vo): ?>
-                        <tr style="cursor:pointer;" onclick="verPedidoOnline(<?= $vo['id'] ?>)">
-                            <td class="ps-3 text-muted">#<?= $vo['id'] ?></td>
-                            <td><?= date('d/m/Y H:i', strtotime($vo['criado_em'])) ?></td>
-                            <td><?= htmlspecialchars($vo['cliente_nome']) ?></td>
-                            <td class="text-muted small"><?= htmlspecialchars($vo['cliente_email']) ?></td>
-                            <td>
-                                <?php
-                                    $formasPg = ['pix' => 'PIX', 'credito' => 'Crédito', 'boleto' => 'Boleto', 'paypal' => 'PayPal'];
-                                    $rotuloPg = $formasPg[$vo['forma_pagamento']] ?? ucfirst($vo['forma_pagamento']);
-                                ?>
-                                <span class="badge bg-info text-dark"><?= $rotuloPg ?></span>
-                                <?php if ($vo['forma_pagamento'] === 'pix' && $vo['pix_pago']): ?>
-                                <span class="badge bg-success">Pago</span>
-                                <?php endif; ?>
-                            </td>
-                            <td class="text-center"><?= $vo['qtd_itens'] ?></td>
-                            <td class="text-end pe-3 fw-bold text-success">R$ <?= number_format($vo['total'], 2, ',', '.') ?></td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                    <tfoot style="background:#f8f9fa;">
-                        <tr>
-                            <td colspan="6" class="ps-3 fw-bold">Total de vendas online no período</td>
-                            <td class="text-end pe-3 fw-bold text-success fs-5">R$ <?= number_format($totalOnlinePeriodo, 2, ',', '.') ?></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-            <?php else: ?>
-            <div class="text-center py-5 text-muted">
-                <i class="bi bi-bag-check-fill" style="font-size:3rem;"></i>
-                <p class="mt-2">Nenhuma venda online (confirmada) encontrada no período selecionado.</p>
             </div>
             <?php endif; ?>
         </div>
@@ -444,21 +270,6 @@ include 'header.php';
     </div>
 </div>
 
-<!-- ══ MODAL DETALHES DO PEDIDO ONLINE ═════════════════════════════ -->
-<div class="modal fade" id="modalPedidoOnline" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header" style="background:#6a1b9a; color:#fff;">
-                <h5 class="modal-title"><i class="bi bi-bag-check-fill"></i> Pedido Online <span id="pedido-online-titulo"></span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="modal-pedido-online-body">
-                <div class="text-center py-3"><span class="spinner-border"></span></div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
     function filtrarVendas() {
         const ini = document.getElementById('filtro-data-ini').value;
@@ -474,7 +285,7 @@ include 'header.php';
         const fd = new FormData();
         fd.append('valor_abertura', valor);
         fd.append('observacao', obs);
-        const res  = await fetch('api.php?endpoint=caixa_abrir', { method:'POST', body:fd });
+        const res  = await fetch('<?= BASE_URL ?>vendas/abrirCaixa', { method:'POST', body:fd });
         const data = await res.json();
         if (data.success) { location.reload(); }
         else { fb.innerHTML = `<div class="alert alert-danger py-2">${data.message}</div>`; }
@@ -490,7 +301,7 @@ include 'header.php';
         fd.append('id', id);
         fd.append('valor_fechamento', valor);
         fd.append('observacao', obs);
-        const res  = await fetch('api.php?endpoint=caixa_fechar', { method:'POST', body:fd });
+        const res  = await fetch('<?= BASE_URL ?>vendas/fecharCaixa', { method:'POST', body:fd });
         const data = await res.json();
         if (data.success) { location.reload(); }
         else { fb.innerHTML = `<div class="alert alert-danger py-2">${data.message}</div>`; }
@@ -500,7 +311,7 @@ include 'header.php';
         document.getElementById('venda-id-titulo').textContent = '#' + id;
         document.getElementById('modal-itens-body').innerHTML = '<div class="text-center py-3"><span class="spinner-border"></span></div>';
         new bootstrap.Modal(document.getElementById('modalItensVenda')).show();
-        const res  = await fetch(`api.php?endpoint=venda_itens&id=${id}`);
+        const res  = await fetch(`<?= BASE_URL ?>vendas/itens?id=${id}`);
         const data = await res.json();
         if (data.success) {
             const rows = data.itens.map(i => `
@@ -520,43 +331,4 @@ include 'header.php';
             document.getElementById('modal-itens-body').innerHTML = '<div class="alert alert-danger">Erro ao carregar itens.</div>';
         }
     }
-
-    const _formasPgOnline = { pix: 'PIX', credito: 'Crédito', boleto: 'Boleto', paypal: 'PayPal' };
-
-    async function verPedidoOnline(id) {
-        document.getElementById('pedido-online-titulo').textContent = '#' + id;
-        document.getElementById('modal-pedido-online-body').innerHTML = '<div class="text-center py-3"><span class="spinner-border"></span></div>';
-        new bootstrap.Modal(document.getElementById('modalPedidoOnline')).show();
-        const res  = await fetch(`api.php?endpoint=pedido_loja_detalhes&id=${id}`);
-        const data = await res.json();
-        if (data.success) {
-            const p = data.pedido;
-            const rows = p.itens.map(i => `
-                <tr>
-                    <td>${i.produto_nome}</td>
-                    <td class="text-center">${i.quantidade}</td>
-                    <td class="text-end">R$ ${parseFloat(i.preco).toFixed(2).replace('.',',')}</td>
-                    <td class="text-end fw-bold">R$ ${(i.quantidade * i.preco).toFixed(2).replace('.',',')}</td>
-                </tr>`).join('');
-            const pgto = _formasPgOnline[p.forma_pagamento] || p.forma_pagamento;
-            document.getElementById('modal-pedido-online-body').innerHTML = `
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6"><strong>Cliente:</strong> ${p.cliente_nome}</div>
-                    <div class="col-md-6"><strong>E-mail:</strong> ${p.cliente_email}</div>
-                    <div class="col-md-6"><strong>Telefone:</strong> ${p.cliente_tel ?? '—'}</div>
-                    <div class="col-md-6"><strong>Pagamento:</strong> ${pgto}${p.forma_pagamento === 'pix' && p.pix_pago == 1 ? ' <span class="badge bg-success">Pago</span>' : ''}</div>
-                    <div class="col-md-6"><strong>Status:</strong> <span class="badge bg-success">${p.status}</span></div>
-                    <div class="col-md-6"><strong>Data do pedido:</strong> ${new Date(p.criado_em).toLocaleString('pt-BR')}</div>
-                </div>
-                <table class="table">
-                    <thead class="table-primary"><tr><th>Produto</th><th class="text-center">Qtd</th><th class="text-end">Preço Unit.</th><th class="text-end">Subtotal</th></tr></thead>
-                    <tbody>${rows}</tbody>
-                    <tfoot class="table-success"><tr><td colspan="3" class="fw-bold">Total</td><td class="text-end fw-bold">R$ ${parseFloat(p.total).toFixed(2).replace('.',',')}</td></tr></tfoot>
-                </table>`;
-        } else {
-            document.getElementById('modal-pedido-online-body').innerHTML = '<div class="alert alert-danger">Erro ao carregar detalhes do pedido.</div>';
-        }
-    }
 </script>
-
-<?php include 'footer.php'; ?>

@@ -1,0 +1,19 @@
+Options -Indexes
+RewriteEngine On
+
+# Allow loja subfolder to work directly
+RewriteCond %{REQUEST_URI} ^/farmavida/loja/ [NC]
+RewriteRule ^ - [L]
+
+# Allow uploads to be served directly
+RewriteCond %{REQUEST_URI} ^/farmavida/uploads/ [NC]
+RewriteRule ^ - [L]
+
+# Allow public folder assets
+RewriteCond %{REQUEST_URI} ^/farmavida/public/ [NC]
+RewriteRule ^ - [L]
+
+# Route everything else through public/index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ public/index.php?url=$1 [QSA,L]

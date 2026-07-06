@@ -35,10 +35,9 @@ $extra_css = <<<CSS
     display:inline-block; padding:4px 10px; border-radius:20px;
     font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
 }
-.bs-pendente               { background:#fff3cd; color:#856404; }
-.bs-confirmado             { background:#d1e7dd; color:#0a3622; }
-.bs-cancelado              { background:#f8d7da; color:#58151c; }
-.bs-aguardando_confirmacao { background:#cfe2ff; color:#084298; } /* Pix declarado — aguarda validação */
+.bs-pendente   { background:#fff3cd; color:#856404; }
+.bs-confirmado { background:#d1e7dd; color:#0a3622; }
+.bs-cancelado  { background:#f8d7da; color:#58151c; }
 
 /* ── Badges pagamento ────────────────────────────── */
 .badge-pgto {
@@ -167,7 +166,6 @@ include 'header.php';
         <select id="filtro-status" onchange="carregarPedidos()">
             <option value="todos">Todos os status</option>
             <option value="pendente">Pendentes</option>
-            <option value="aguardando_confirmacao">Aguard. Confirmação (PIX)</option>
             <option value="confirmado">Confirmados</option>
             <option value="cancelado">Cancelados</option>
         </select>
@@ -370,8 +368,8 @@ function renderTabela(pedidos) {
                     <button class="btn btn-sm btn-outline-success" title="Ver detalhes" onclick="verDetalhes(${p.id})">
                         <i class="bi bi-eye"></i>
                     </button>
-                    ${(p.status === 'pendente' || p.status === 'aguardando_confirmacao') ? `
-                    <button class="btn btn-sm btn-success" title="${p.status === 'aguardando_confirmacao' ? '⚡ Confirmar PIX declarado' : 'Confirmar pedido'}" onclick="alterarStatus(${p.id},'confirmado')">
+                    ${p.status === 'pendente' ? `
+                    <button class="btn btn-sm btn-success" title="Confirmar pedido" onclick="alterarStatus(${p.id},'confirmado')">
                         <i class="bi bi-check-lg"></i>
                     </button>` : ''}
                     ${p.status !== 'cancelado' ? `

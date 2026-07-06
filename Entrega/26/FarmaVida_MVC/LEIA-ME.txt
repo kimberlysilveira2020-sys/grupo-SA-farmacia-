@@ -1,0 +1,42 @@
+=== FarmaVida MVC - Instruções de Instalação ===
+
+ESTRUTURA:
+  FarmaVida/               ← coloque esta pasta em htdocs/
+  ├── config.php           ← configurações (DB, BASE_URL)
+  ├── .htaccess            ← roteamento principal
+  ├── public/
+  │   ├── index.php        ← front controller
+  │   ├── .htaccess        ← rewrite das rotas
+  │   └── style.css        ← estilos
+  ├── core/                ← App, Controller, Model base
+  ├── app/
+  │   ├── Controllers/     ← lógica de cada tela
+  │   ├── Models/          ← acesso ao banco
+  │   └── Views/           ← HTML de cada tela
+  ├── loja/                ← loja online (sistema separado)
+  └── uploads/             ← imagens de produtos e banners
+
+URLS DO SISTEMA INTERNO:
+  /farmavida/              → Dashboard
+  /farmavida/auth/login    → Login
+  /farmavida/auth/logout   → Logout
+  /farmavida/auth/cadastro → Cadastro de usuário
+  /farmavida/dashboard     → Dashboard
+  /farmavida/vendas        → Vendas & Caixa
+  /farmavida/produtos      → Estoque & Produtos
+  /farmavida/clientes      → Clientes
+  /farmavida/relatorios    → Relatórios
+
+LOJA ONLINE:
+  /farmavida/loja/         → Loja (acesso direto, não passa pelo MVC)
+
+CONFIGURAÇÃO (config.php):
+  - Linha 1: define('BASE_URL', '/farmavida/');
+    Se sua pasta não se chama "farmavida", ajuste aqui.
+  - DB_HOST, DB_NAME, DB_USER, DB_PASS: configure conforme seu banco.
+
+HABILITANDO MOD_REWRITE no XAMPP:
+  1. Abra httpd.conf (Apache)
+  2. Descomente: LoadModule rewrite_module modules/mod_rewrite.so
+  3. Mude AllowOverride None → AllowOverride All para o htdocs
+  4. Reinicie o Apache
