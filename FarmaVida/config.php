@@ -22,7 +22,7 @@ class Config {
 
     // ── Configurações PIX ──────────────────────────────────────────
     // Preencha com os dados da sua conta PIX
-    const PIX_CHAVE       = '137.277.219-79'; // Chave PIX: CPF, CNPJ, e-mail, telefone ou chave aleatória
+    const PIX_CHAVE       = '13727721979'; // Chave PIX tipo CPF — sem pontos ou traço (padrão EMV)
     const PIX_NOME        = 'Caio Eduardo Aguiar';         // Nome do recebedor (máx 25 chars)
     const PIX_CIDADE      = 'JOINVILLE';                      // Cidade do recebedor (máx 15 chars)
     const PIX_IDENTIFICADOR = 'FARMAVIDA';                    // Identificador da loja no QR Code (máx 25 chars)

@@ -946,13 +946,28 @@ button { cursor:pointer; font-family:inherit; }
             <div style="display:flex;flex-direction:column;gap:10px;">
 
                 <!-- PIX -->
-                <button class="pgto-btn" onclick="selecionarPagamento('pix')" style="border-color:#1daa5c;background:#f1faf5;">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Logo%E2%80%94pix_powered_by_Banco_Central_%28Brazil%2C_2020%29.svg" style="height:28px;width:auto;">
+                <button class="pgto-btn pgto-pix-btn" onclick="selecionarPagamento('pix')">
+                    <div class="pix-icon-wrap">
+                        <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" class="pix-svg-icon">
+                          <defs>
+                            <linearGradient id="pixGrad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+                              <stop offset="0%" stop-color="#32d583"/>
+                              <stop offset="100%" stop-color="#0a8a4a"/>
+                            </linearGradient>
+                          </defs>
+                          <rect width="44" height="44" rx="12" fill="url(#pixGrad)"/>
+                          <path d="M22 8 L28.5 14.5 L22 21 L15.5 14.5 Z" fill="white" opacity="0.95"/>
+                          <path d="M35 21 L28.5 14.5 L22 21 L28.5 27.5 Z" fill="white" opacity="0.95"/>
+                          <path d="M22 34 L28.5 27.5 L22 21 L15.5 27.5 Z" fill="white" opacity="0.95"/>
+                          <path d="M9 21 L15.5 14.5 L22 21 L15.5 27.5 Z" fill="white" opacity="0.95"/>
+                        </svg>
+                    </div>
                     <div class="pgto-info">
-                        <span class="pgto-titulo" style="color:#128446;">PIX</span>
+                        <span class="pgto-titulo pix-label">PIX</span>
                         <span class="pgto-sub">Pagamento instantâneo · QR Code na hora</span>
                     </div>
-                    <i class="bi bi-chevron-right" style="color:#1daa5c;margin-left:auto;"></i>
+                    <span class="pix-badge-instant">Instantâneo</span>
+                    <i class="bi bi-chevron-right pix-chev"></i>
                 </button>
 
                 <!-- Cartão de Crédito -->
@@ -963,16 +978,6 @@ button { cursor:pointer; font-family:inherit; }
                         <span class="pgto-sub">Visa, Mastercard, Elo, Hipercard · até 12x</span>
                     </div>
                     <i class="bi bi-chevron-right" style="color:#1565c0;margin-left:auto;"></i>
-                </button>
-
-                <!-- PayPal -->
-                <button class="pgto-btn" onclick="selecionarPagamento('paypal')" style="border-color:#003087;background:#f0f4ff;">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" style="height:26px;width:auto;">
-                    <div class="pgto-info">
-                        <span class="pgto-titulo" style="color:#003087;">PayPal</span>
-                        <span class="pgto-sub">Pague com sua conta PayPal com segurança</span>
-                    </div>
-                    <i class="bi bi-chevron-right" style="color:#003087;margin-left:auto;"></i>
                 </button>
 
                 <!-- Boleto -->
@@ -1005,14 +1010,80 @@ button { cursor:pointer; font-family:inherit; }
     display:flex;align-items:center;gap:14px;
     border:2px solid #ddd;border-radius:12px;
     padding:14px 16px;cursor:pointer;
-    transition:filter .15s, transform .1s;text-align:left;
-    font-family:inherit;width:100%;
+    transition:filter .15s, transform .1s, box-shadow .15s;text-align:left;
+    font-family:inherit;width:100%;background:#fff;
 }
-.pgto-btn:hover   { filter:brightness(.95); transform:translateY(-1px); }
+.pgto-btn:hover   { filter:brightness(.97); transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.1); }
 .pgto-btn:active  { transform:translateY(0); }
-.pgto-info        { display:flex;flex-direction:column;gap:2px; }
+.pgto-info        { display:flex;flex-direction:column;gap:2px;flex:1; }
 .pgto-titulo      { font-weight:800;font-size:.93rem; }
 .pgto-sub         { font-size:.73rem;color:#666; }
+
+/* ── Botão PIX moderno ── */
+.pgto-pix-btn {
+    border-color: #1daa5c;
+    background: linear-gradient(135deg, #f0fdf6 0%, #e6f9ef 100%);
+    position: relative;
+    overflow: hidden;
+}
+.pgto-pix-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(50,213,131,.08) 0%, rgba(10,138,74,.12) 100%);
+    opacity: 0;
+    transition: opacity .2s;
+}
+.pgto-pix-btn:hover::before { opacity: 1; }
+.pgto-pix-btn:hover { filter: none; box-shadow: 0 6px 20px rgba(29,170,92,.25); border-color:#0a8a4a; }
+
+.pix-icon-wrap {
+    flex-shrink: 0;
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 3px 10px rgba(10,138,74,.35);
+    transition: transform .2s, box-shadow .2s;
+}
+.pgto-pix-btn:hover .pix-icon-wrap {
+    transform: scale(1.06) rotate(-3deg);
+    box-shadow: 0 6px 16px rgba(10,138,74,.4);
+}
+.pix-svg-icon { width: 44px; height: 44px; display: block; }
+
+.pix-label {
+    color: #0a6e3b;
+    font-size: 1rem;
+    letter-spacing: .2px;
+}
+
+.pix-badge-instant {
+    flex-shrink: 0;
+    font-size: .65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    background: linear-gradient(135deg, #32d583, #0a8a4a);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 20px;
+    margin-left: auto;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(10,138,74,.3);
+    animation: pixPulse 2.4s ease-in-out infinite;
+}
+@keyframes pixPulse {
+    0%, 100% { box-shadow: 0 2px 6px rgba(10,138,74,.3); }
+    50%       { box-shadow: 0 2px 12px rgba(10,138,74,.55); }
+}
+
+.pix-chev {
+    color: #1daa5c;
+    margin-left: 6px;
+    font-size: .9rem;
+    transition: transform .2s;
+}
+.pgto-pix-btn:hover .pix-chev { transform: translateX(3px); }
 </style>
 
 <!-- ══ MODAL CARTÃO DE CRÉDITO ══ -->
@@ -1099,28 +1170,6 @@ button { cursor:pointer; font-family:inherit; }
 </style>
 
 <!-- ══ MODAL PAYPAL LOADING ══ -->
-<div class="modal-overlay" id="modal-paypal">
-    <div class="modal-box" style="max-width:380px;">
-        <div class="modal-box__header" style="background:linear-gradient(135deg,#003087,#009cde);">
-            <h3><i class="bi bi-paypal"></i> PayPal</h3>
-            <button onclick="voltarPagamento('paypal')"><i class="bi bi-x-lg"></i></button>
-        </div>
-        <div class="modal-box__body" style="padding:32px 24px;text-align:center;" id="paypal-body">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" style="height:44px;margin-bottom:20px;">
-            <p style="color:#444;font-size:.9rem;margin-bottom:24px;">
-                Você será redirecionado para o ambiente seguro do PayPal para concluir o pagamento.
-            </p>
-            <div class="spinner" style="margin:0 auto 14px;width:36px;height:36px;border-color:#003087;border-top-color:transparent;display:none;" id="paypal-spinner"></div>
-            <button onclick="confirmarPaypal()" id="btn-paypal-ir"
-                style="width:100%;background:#ffc439;border:none;border-radius:10px;padding:14px;
-                       font-weight:800;font-size:1rem;cursor:pointer;color:#003087;display:flex;align-items:center;justify-content:center;gap:8px;">
-                <i class="bi bi-box-arrow-up-right"></i> Continuar para o PayPal
-            </button>
-            <p style="font-size:.73rem;color:#999;margin-top:12px;">Você voltará para a loja após o pagamento</p>
-        </div>
-    </div>
-</div>
-
 <!-- ══ MODAL PIX ══ -->
 <div class="modal-overlay" id="modal-pix">
     <div class="modal-box" style="max-width:480px;">
@@ -1506,7 +1555,6 @@ async function selecionarPagamento(forma) {
     fecharModal('pagamento');
     if      (forma === 'pix')    await iniciarFluxoPix();
     else if (forma === 'cartao') abrirFluxoCartao();
-    else if (forma === 'paypal') abrirFluxoPaypal();
     else if (forma === 'boleto') await iniciarFluxoBoleto();
     else                         await finalizarPedidoRetirada();
 }
@@ -1824,57 +1872,6 @@ function copiarBoleto(linha) {
     });
 }
 
-// ══════════════════════════════════════════════════════════════════
-// PAYPAL
-// ══════════════════════════════════════════════════════════════════
-function abrirFluxoPaypal() {
-    document.getElementById('paypal-spinner').style.display='none';
-    document.getElementById('btn-paypal-ir').style.display='flex';
-    abrirModal('paypal');
-}
-
-async function confirmarPaypal() {
-    document.getElementById('btn-paypal-ir').style.display='none';
-    document.getElementById('paypal-spinner').style.display='block';
-    const fd=new FormData();
-    fd.append('itens',JSON.stringify(_itensCheckout));
-    const r=await fetch('loja_api.php?endpoint=paypal_criar_order',{method:'POST',body:fd});
-    const d=await r.json();
-    if (d.success && d.approve_url) {
-        carrinho=[]; salvarCarrinho(); atualizarCarrinho();
-        window.open(d.approve_url,'paypal_checkout','width=500,height=700,scrollbars=yes');
-        document.getElementById('paypal-body').innerHTML = `
-            <img src="https://upload.wikimedia.org/wikipedia/commons/b/b5/PayPal.svg" style="height:36px;margin-bottom:16px;">
-            <p style="color:#444;font-size:.88rem;margin-bottom:6px;">Uma janela do PayPal foi aberta.</p>
-            <p style="color:#666;font-size:.8rem;margin-bottom:20px;">Conclua o pagamento e clique abaixo.</p>
-            <button onclick="capturarPaypal('${d.order_id}',${d.pedido_id})"
-                style="width:100%;background:#003087;color:#fff;border:none;border-radius:10px;
-                       padding:13px;font-weight:800;font-size:.95rem;cursor:pointer;margin-bottom:10px;">
-                <i class="bi bi-check-circle-fill"></i> Já paguei no PayPal
-            </button>
-            <button onclick="voltarPagamento('paypal')" style="width:100%;background:#eee;border:none;border-radius:8px;padding:10px;cursor:pointer;font-size:.85rem;">
-                Cancelar
-            </button>`;
-    } else {
-        document.getElementById('paypal-body').innerHTML=`
-            <p style="color:#c62828;text-align:center;padding:20px;">
-                <i class="bi bi-exclamation-triangle-fill" style="font-size:2rem;"></i><br>
-                ${d.message||'Erro ao conectar com PayPal. Configure as credenciais no config.php.'}
-            </p>
-            <button onclick="voltarPagamento('paypal')" style="width:100%;background:#eee;border:none;border-radius:8px;padding:10px;cursor:pointer;">Voltar</button>`;
-    }
-}
-
-async function capturarPaypal(orderId, pedidoId) {
-    const fd=new FormData();
-    fd.append('order_id',orderId); fd.append('pedido_id',pedidoId);
-    const r=await fetch('loja_api.php?endpoint=paypal_capturar',{method:'POST',body:fd});
-    const d=await r.json();
-    fecharModal('paypal');
-    if (d.success) toast(`✅ Pedido #${d.pedido_id} confirmado pelo PayPal!`);
-    else           toast(d.message||'Pagamento PayPal não confirmado.', true);
-}
-
 // Fluxo PIX — gera QR Code
 async function iniciarFluxoPix() {
     // Reseta estado
@@ -1989,12 +1986,41 @@ function copiarPix(el, payload) {
     });
 }
 
-// Usuário confirmou que pagou — fecha com sucesso
-function confirmarPagamentoPix() {
-    pixConfirmado = true;
-    document.getElementById('modal-pix').classList.remove('aberto');
-    toast('🎉 Pedido #' + pixPedidoId + ' confirmado! Aguardamos a compensação do PIX.');
-    pixPedidoId = null;
+// Usuário declara que pagou — confirma no servidor antes de fechar o modal
+async function confirmarPagamentoPix() {
+    if (!pixPedidoId) return;
+
+    const body = document.getElementById('pix-body');
+
+    // Desabilita os botões e exibe loading enquanto aguarda o servidor
+    const btnConfirmar = body.querySelector('button[onclick="confirmarPagamentoPix()"]');
+    const btnCancelar  = body.querySelector('button[onclick="fecharPixSemPagamento()"]');
+    if (btnConfirmar) { btnConfirmar.disabled = true; btnConfirmar.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:14px;height:14px;border-width:2px;"></span> Confirmando...'; }
+    if (btnCancelar)  { btnCancelar.disabled  = true; }
+
+    try {
+        const fd = new FormData();
+        fd.append('pedido_id', pixPedidoId);
+        const r = await fetch('loja_api.php?endpoint=confirmar_pix', { method: 'POST', body: fd });
+        const d = await r.json();
+
+        if (d.success) {
+            pixConfirmado = true;
+            const idConfirmado = pixPedidoId;
+            pixPedidoId = null;
+            document.getElementById('modal-pix').classList.remove('aberto');
+            toast('✅ Pedido #' + idConfirmado + ' registrado! Confirmaremos após a compensação do PIX.');
+        } else {
+            // Restaura botões e mostra erro inline
+            if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.innerHTML = '<i class="bi bi-check-circle"></i> Já paguei'; }
+            if (btnCancelar)  { btnCancelar.disabled  = false; }
+            toast('⚠️ ' + (d.message || 'Erro ao registrar pagamento. Tente novamente.'), true);
+        }
+    } catch(e) {
+        if (btnConfirmar) { btnConfirmar.disabled = false; btnConfirmar.innerHTML = '<i class="bi bi-check-circle"></i> Já paguei'; }
+        if (btnCancelar)  { btnCancelar.disabled  = false; }
+        toast('⚠️ Erro de conexão. Tente novamente.', true);
+    }
 }
 
 // Usuário fechou sem pagar — cancela o pedido no banco

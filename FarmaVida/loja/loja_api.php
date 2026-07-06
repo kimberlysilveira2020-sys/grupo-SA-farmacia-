@@ -284,6 +284,57 @@ try {
             ]);
             break;
 
+        // ── CONFIRMAR PIX — chamado quando o usuário clica "Já paguei" ─
+        // Valida que o pedido existe, pertence ao cliente e ainda está pendente.
+        // Marca pix_pago=1 e status='aguardando_confirmacao' — a equipe da
+        // farmácia confirma manualmente (ou um webhook real faz isso).
+        // NUNCA confirma automaticamente sem alguma evidência.
+        case 'confirmar_pix':
+            if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Não autenticado.'], 401);
+
+            $pedidoId = (int)($_POST['pedido_id'] ?? 0);
+            if (!$pedidoId) jsonResp(['success'=>false,'message'=>'ID de pedido inválido.']);
+
+            // Verifica que o pedido pertence ao cliente logado e ainda está pendente (não pago)
+            $chk = $pdo->prepare("
+                SELECT id, total, pix_txid
+                FROM pedidos
+                WHERE id = ? AND cliente_id = ? AND forma_pagamento = 'pix' AND pix_pago = 0
+            ");
+            $chk->execute([$pedidoId, clienteId()]);
+            $pedido = $chk->fetch();
+
+            if (!$pedido) {
+                // Pode ser que o pedido já foi pago anteriormente ou não pertence ao cliente
+                $jaExiste = $pdo->prepare("SELECT status FROM pedidos WHERE id=? AND cliente_id=?");
+                $jaExiste->execute([$pedidoId, clienteId()]);
+                $row = $jaExiste->fetch();
+                if ($row && $row['status'] === 'aguardando_confirmacao') {
+                    jsonResp(['success'=>true,'message'=>'Pedido já registrado como aguardando confirmação.', 'pedido_id'=>$pedidoId]);
+                }
+                jsonResp(['success'=>false,'message'=>'Pedido não encontrado ou já processado.'], 404);
+            }
+
+            // Registra a declaração de pagamento — status intermediário que a farmácia precisa confirmar
+            $upd = $pdo->prepare("
+                UPDATE pedidos
+                SET pix_pago = 1, status = 'aguardando_confirmacao'
+                WHERE id = ? AND cliente_id = ? AND pix_pago = 0
+            ");
+            $upd->execute([$pedidoId, clienteId()]);
+
+            if ($upd->rowCount() === 0) {
+                jsonResp(['success'=>false,'message'=>'Não foi possível registrar o pagamento. Tente novamente.']);
+            }
+
+            jsonResp([
+                'success'    => true,
+                'pedido_id'  => $pedidoId,
+                'status'     => 'aguardando_confirmacao',
+                'message'    => 'Pagamento declarado. Seu pedido será confirmado após a compensação do PIX.',
+            ]);
+            break;
+
         // ── CANCELAR PIX (pedido não pago — remove do banco) ────────
         case 'cancelar_pix':
             if (!clienteLogado()) jsonResp(['success'=>false,'message'=>'Não autenticado.'],401);
